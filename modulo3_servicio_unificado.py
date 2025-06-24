@@ -44,6 +44,8 @@ def modulo_servicio():
             }
 
             cliente = tk.StringVar(value="")
+
+            # Selección del cliente externo
             subventana = tk.Toplevel(ventana)
             subventana.title("Seleccione Cliente Externo")
             subventana.geometry("300x200")
@@ -69,8 +71,9 @@ def modulo_servicio():
                 return
             
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
-            
+            # comportamiento para Tercero (pago inmediato)
             if cliente.get() == "Tercero (pago inmediato)":
+
                 # Paso 1:Solicita placa del vehículo (formato LLL111)
                 while True:
                     placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
@@ -86,6 +89,31 @@ def modulo_servicio():
                 remision = remision.strip().upper() if remision else ""
                 # aqui concateno placa espacio remision en un id final
                 id_final = f"{placa} {remision}".strip()
+                # ingreso en variable clave el tipo y id final
+                clave = f"{tipo}:{cliente.get()}:{id_final}"
+                #clave = f"{tipo}:{id_final}"
+                # agrego fecha actual con hora, minutos y segundos
+                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                # 🔁 Si ya hay un pesaje iniciado, hacemos el cierre automáticamente
+                if clave in pesajes_temporales:
+                    peso_ini, fecha_ini, razon, nit, correo = pesajes_temporales[clave]
+                    peso_neto = abs(peso - peso_ini)
+                    # Mensaje tiquete y resultado en pantalla
+                    messagebox.showinfo("Pesaje cerrado",
+                        f"Cliente: {razon}\n"
+                        f"NIT: {nit}\n"
+                        f"Correo: {correo}\n"
+                        f"ID: {id_final}\n"
+                        f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
+                        f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
+                        f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
+                    pesajes_confirmados.append((tipo, id_final, peso_ini, peso, fecha_ini, fecha_actual))
+                    del pesajes_temporales[clave]
+                    return  # Salimos porque ya hicimos el cierre
+
+                # 🔁 Si no hay pesaje previo, solicitamos los demás datos
+
 
                 # Paso 3: funcion de Nombre o razón social (obligatorio y con validación)
                 def es_valido_nombre_razon(texto):
@@ -136,34 +164,85 @@ def modulo_servicio():
                     else:
                         correo = ""
                         break
-                    
-                # Paso 6: indica fecha actual con hora, minutos y segundos
-                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # Paso 6: Preguntar si tendrá cierre
+                cerrar = messagebox.askyesno("Cierre", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
 
+                if cerrar:
+                    # 🔁 Se registra como pesaje inicial
+                    pesajes_temporales[clave] = (peso, fecha_actual, razon, nit, correo)
+                    messagebox.showinfo("Pesaje inicial",
+                        f"Peso inicial registrado: {peso:.2f} kg\nID: {id_final}", parent=ventana)
+                else:
+                    # 🔁 Permitir ingresar peso de cierre manual
+                    fecha_peso_inicial = datetime.now().strftime('%Y-%m-%d %H:%M:%S') # Toma fecha del peso leído Antes de pedir peso manual
+                    peso_manual = simpledialog.askstring("Peso cierre manual", "Ingrese el peso de cierre manual (kg) o deje vacío si no hay peso final:", parent=ventana)
+
+                    # Paso 7: Mensaje tiquete y resultado en pantalla,
+                    if peso_manual and peso_manual.strip().isdigit():
+                        peso_final = int(peso_manual.strip())
+                        fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Después de confirmarlo y escribir peso final Toma fecha al cierre
+                        peso_neto = abs(peso_final - peso)
+                        messagebox.showinfo("Pesaje manual",
+                            f"Cliente: {razon}\n"
+                            f"NIT: {nit}\n"
+                            f"Correo: {correo}\n"
+                            f"ID: {id_final}\n"
+                            f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
+                            f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
+                            f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
+                        pesajes_confirmados.append((tipo, id_final, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
+                    else:
+                        #Solo muestra el peso actual si no se ingresó cierre manual
+                        messagebox.showinfo("Pesaje registrado",
+                            f"Cliente: {razon}\n"
+                            f"NIT: {nit}\n"
+                            f"Correo: {correo}\n"
+                            f"ID: {id_final}\n"
+                            f"Peso actual: {peso:.2f} kg\n"
+                            f"Fecha: {fecha_actual}", parent=ventana)
+                return  # Fin del flujo modificado
                 # Paso 7: Mensaje tiquete y resultado en pantalla
-                messagebox.showinfo("Resultado",
-                    f"Cliente: {razon}\n"
-                    f"NIT o Cédula: {nit}\n"
-                    f"Correo: {correo}\n"
-                    f"ID: {id_final}\n"
-                    f"Peso actual: {peso:.2f} kg\n"
-                    f"Fecha: {fecha_actual}", parent=ventana)
-                return  # Evita seguir a la lógica de pesajes para terceros
+                #messagebox.showinfo("Resultado",
+                 #   f"Cliente: {razon}\n"
+                 #   f"NIT o Cédula: {nit}\n"
+                 #   f"Correo: {correo}\n"
+                 #   f"ID: {id_final}\n"
+                 #   f"Peso actual: {peso:.2f} kg\n"
+                 #   f"Fecha: {fecha_actual}", parent=ventana)
+                #return  # Evita seguir a la lógica de pesajes para terceros
 
             # Lógica para externos con pago mensual (Cipreses, Núcleos, Construinmuniza)
-            # Solicita placa (con o sin remisión) y pregunta si habrá cierre de pesaje
-
+            # Solicita placa (formato LLL111) y pregunta si habrá cierre de pesaje
             while True:
-                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo:", parent=ventana)
+                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
                 if placa is None:
                     return
                 placa = placa.strip().upper()
-                if re.fullmatch(r'[A-Z]{3}\d{3}( [A-Z0-9]+)?', placa):
+                if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
                     break
-                messagebox.showerror("Inválido", "Formato incorrecto. Ej: ABC123 o ABC123 XYZ", parent=ventana)
+                messagebox.showerror("Inválido", "Formato de placa incorrecto. Ejemplo válido: ABC123", parent=ventana)
+            # Solicita placa con id opcional y pregunta si habrá cierre de pesaje
+            #while True:
+                #placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo:", parent=ventana)
+                #if placa is None:
+                    #return
+                #placa = placa.strip().upper()
+                #if re.fullmatch(r'[A-Z]{3}\d{3}( [A-Z0-9]+)?', placa):
+                    #break
+                #messagebox.showerror("Inválido", "Formato incorrecto. Ej: ABC123 o ABC123 XYZ", parent=ventana)
 
-            id_ingresado = placa  # El ID es la placa (o con sufijo opcional)
-            clave = f"{tipo}:{id_ingresado}"
+            #id_ingresado = placa  # El ID es la placa (o con sufijo opcional)
+            # Remisión opcional para externos con pago mensual
+            remision = simpledialog.askstring("Remisión", "Ingrese remisión (opcional):", parent=ventana)
+            remision = remision.strip().upper() if remision else ""
+            if remision:
+                id_ingresado = f"{placa} {remision}"
+            else:
+                id_ingresado = placa
+
+            #clave = f"{tipo}:{id_ingresado}"
+            clave = f"{tipo}:{cliente.get()}:{id_ingresado}"
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
             # Solo preguntamos si habrá cierre si NO hay un pesaje inicial guardado
@@ -310,7 +389,7 @@ def modulo_servicio():
                 messagebox.showinfo("Pesaje inicial",
                     f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
 
-        # Solicita los mismos datos que Inmuniza/Aserrio, pero solo imprime peso actual
+        # Solicita los mismos datos que Inmuniza/Aserrio, pero solo imprime peso actual para Astillable
         elif tipo == "Astillable":
             # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
             while True:

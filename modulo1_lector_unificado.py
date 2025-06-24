@@ -112,6 +112,7 @@ def verificar_peso():
     while True:
         try:
             ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.05)
+            ser.reset_input_buffer()  # ✅ Limpia el búfer de entrada para quitar residuos fantasmas en el puerto com
             print(f"✅ Conectado a {PUERTO_CONFIGURADO}")
             break
         except serial.SerialException:
@@ -128,6 +129,9 @@ def verificar_peso():
     proceso_modulo3 = None
     tiempo_sin_datos = 0
     intervalo_reconexion = 30
+
+    datos_validos_previos = 0
+    esperando_datos = True
 
     while True:
         root.update()
@@ -148,6 +152,15 @@ def verificar_peso():
                     continue
 
                 if re.search(r"[+-]\s*\d+\s*kg", linea):
+                    # 🧹 Esperar 2 lecturas válidas antes de procesar normalmente para evitar residuos fantasma del puerto com
+                    if esperando_datos:
+                        datos_validos_previos += 1
+                        print(f"⏳ Esperando datos válidos ({datos_validos_previos}/2): {linea}")
+                        if datos_validos_previos < 2:
+                            continue
+                        else:
+                            esperando_datos = False                    
+                    
                     tiempo_sin_datos = 0
                     ventana_desconexion.cerrar()
                     print(f"📥 Peso recibido: {linea}")
@@ -155,12 +168,12 @@ def verificar_peso():
                     if match:
                         peso = int(match.group(1))
                         config.peso_actual = peso
-
+                        #verificamos si el peso es mayor a 80 toneladas para abir aviso de sobrepeso
                         if peso >= 80000:
                             ventana_alerta_peso.mostrar(peso)
                         else:
                             ventana_alerta_peso.cerrar()
-
+                        #verificamos si el peso es mayor a 300 para abrir el modulo 3
                         if peso >= 300:
                             if proceso_modulo3 is None or proceso_modulo3.poll() is not None or not psutil.pid_exists(proceso_modulo3.pid):
                                 print(f"🚨 Peso alto detectado: {peso} kg")
