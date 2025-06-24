@@ -6,7 +6,8 @@ import json  # Para interpretar los datos recibidos en formato JSON
 from datetime import datetime  # Para registrar fecha y hora
 
 # Diccionario para almacenar pesos temporales de pesajes parciales (por ID)
-pesajes_temporales = {}
+pesajes_temporales = {}  # Guarda pesajes en curso por tipo:ID
+pesajes_confirmados = []  # Guarda pesajes finalizados como tuplas (tipo, ID, peso_inicial, peso_final, fecha_ini, fecha_fin)
 
 # Función que se conecta al socket para obtener el peso actual y la hora desde modulo1
 def obtener_datos_peso():
@@ -35,15 +36,17 @@ def modulo_servicio():
             id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:", parent=ventana)  # Pide el ID
             if not id_ingresado:
                 return  # Si no se ingresa nada, se cancela la operación
-
+            id_ingresado = id_ingresado.upper()  # convierte todo a mayúsculas
+            clave = f"{tipo}:{id_ingresado}"  #  necesario para poder usar clave correctamente
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha y hora actual
 
             if clave in pesajes_temporales:
                 # Si ya hay un peso inicial registrado para ese ID
                 peso_inicial, fecha_inicial = pesajes_temporales[clave]
-                peso_neto = peso - peso_inicial  # Se calcula el peso neto
+                peso_neto = abs(peso - peso_inicial)  # Se calcula el peso neto y Asegura que el peso neto sea siempre positivo
                 messagebox.showinfo("Resultado",
                     f"Pesaje final registrado.\nID: {id_ingresado}\nPeso Neto: {peso_neto:.2f} kg\nInicio: {fecha_inicial}\nFin: {fecha_actual}")
+                pesajes_confirmados.append((tipo, id_ingresado, peso_inicial, peso, fecha_inicial, fecha_actual))
                 del pesajes_temporales[clave]  # Elimina el registro temporal
             else:
                 # Si es el primer pesaje de ese ID, lo guarda
@@ -64,6 +67,15 @@ def modulo_servicio():
 
     # Creación de la ventana principal
     ventana = tk.Tk()
+
+    # Función que se ejecuta al cerrar la ventana principal
+    def al_cerrar():
+        print("📌 Sesión de pesajes confirmados:")
+        for tipo, id_, p_ini, p_fin, f_ini, f_fin in pesajes_confirmados:
+            print(f"→ Tipo: {tipo}, ID: {id_}, Peso Neto: {p_fin - p_ini:.2f} kg, De: {f_ini} a {f_fin}")
+        ventana.destroy()  # Cierra la ventana completamente
+
+    ventana.protocol("WM_DELETE_WINDOW", al_cerrar)  # Asocia el cierre de ventana al manejo manual
     ventana.title("Servicio de Báscula")  # Título de la ventana
     ventana.attributes("-topmost", True)  # Hace que la ventana permanezca siempre por encima de otras
 
