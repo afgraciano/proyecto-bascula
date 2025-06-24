@@ -1,6 +1,10 @@
 import tkinter as tk
+from tkinter import simpledialog, messagebox
 import socket
 import json
+from datetime import datetime
+
+pesajes_temporales = {}
 
 def obtener_datos_peso():
     try:
@@ -12,24 +16,63 @@ def obtener_datos_peso():
     except:
         return 0, ""
 
-def actualizar_peso():
-    peso, hora = obtener_datos_peso()
-    peso_label.config(text=f"{peso:.2f} kg")
-    hora_label.config(text=f"{hora}")
-    root.after(500, actualizar_peso)
+def modulo_servicio():
+    def verificar_servicio():
+        tipo = tipo_var.get()
+        peso, _ = obtener_datos_peso()
 
-root = tk.Tk()
-root.title("Monitor de Peso en Tiempo Real")
+        if tipo == "Externo":
+            messagebox.showinfo("Servicio", f"Pesaje externo detectado: {peso:.2f} kg")
 
-frame = tk.Frame(root, padx=20, pady=20)
-frame.pack()
+        elif tipo in ["Inmuniza", "Aserrio"]:
+            id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:")
+            if not id_ingresado:
+                return
+            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            if id_ingresado in pesajes_temporales:
+                peso_inicial, fecha_inicial = pesajes_temporales[id_ingresado]
+                peso_neto = peso - peso_inicial
+                messagebox.showinfo("Resultado",
+                    f"Pesaje final registrado.\nID: {id_ingresado}\nPeso Neto: {peso_neto:.2f} kg\nInicio: {fecha_inicial}\nFin: {fecha_actual}")
+                del pesajes_temporales[id_ingresado]
+            else:
+                pesajes_temporales[id_ingresado] = (peso, fecha_actual)
+                messagebox.showinfo("Pesaje inicial",
+                    f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}")
 
-tk.Label(frame, text="Peso actual:", font=("Arial", 14)).pack()
-peso_label = tk.Label(frame, text="---", font=("Arial", 28, "bold"), fg="blue")
-peso_label.pack()
+        else:  # Astillero
+            messagebox.showinfo("Astillero", f"Peso actual mostrado: {peso:.2f} kg")
 
-hora_label = tk.Label(frame, text="", font=("Arial", 10), fg="gray")
-hora_label.pack(pady=(5, 0))
+    def actualizar_peso_gui():
+        peso, hora = obtener_datos_peso()
+        peso_label.config(text=f"{peso:.2f} kg")
+        hora_label.config(text=hora)
+        ventana.after(500, actualizar_peso_gui)
 
-actualizar_peso()
-root.mainloop()
+    ventana = tk.Tk()
+    ventana.title("Servicio de Báscula")
+
+    # Pantalla de monitoreo
+    marco_peso = tk.Frame(ventana, bg="white", relief="sunken", bd=2)
+    marco_peso.pack(pady=10, fill="x")
+
+    tk.Label(marco_peso, text="Peso actual (kg):", font=("Arial", 12)).pack()
+    peso_label = tk.Label(marco_peso, text="---", font=("Arial", 24, "bold"), fg="blue")
+    peso_label.pack()
+    hora_label = tk.Label(marco_peso, text="", font=("Arial", 10), fg="gray")
+    hora_label.pack(pady=(2, 5))
+
+    actualizar_peso_gui()
+
+    # Selección de tipo de servicio
+    tk.Label(ventana, text="Tipo de servicio:").pack(pady=5)
+    tipo_var = tk.StringVar(value="Externo")
+    for tipo in ["Externo", "Inmuniza", "Aserrio", "Astillero"]:
+        tk.Radiobutton(ventana, text=tipo, variable=tipo_var, value=tipo).pack(anchor="w")
+
+    tk.Button(ventana, text="Aceptar", command=verificar_servicio).pack(pady=10)
+
+    ventana.mainloop()
+
+if __name__ == "__main__":
+    modulo_servicio()
