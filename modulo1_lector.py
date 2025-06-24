@@ -7,12 +7,10 @@ import subprocess
 import tkinter as tk
 from config import PUERTO_CONFIGURADO
 
-# Ejecuta el módulo de servicio y devuelve el proceso
 def ejecutar_modulo3():
     ruta_modulo3 = os.path.join(os.path.dirname(__file__), 'modulo3_servicio.py')
     return subprocess.Popen(["python", ruta_modulo3], shell=True)
 
-# Clase para la ventana de desconexión
 class VentanaDesconexion:
     def __init__(self, root):
         self.root = root
@@ -29,11 +27,9 @@ class VentanaDesconexion:
         self.ventana.geometry("300x170")
         self.ventana.resizable(False, False)
 
-        # Siempre al frente
         self.ventana.attributes("-topmost", True)
         self.ventana.lift()
         self.ventana.focus_force()
-
         self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)
 
         label = tk.Label(self.ventana, text="⚠️ Báscula desconectada.\nSeleccione la causa:", font=("Arial", 11))
@@ -54,13 +50,11 @@ class VentanaDesconexion:
             self.ventana.destroy()
         self.activa = False
 
-# Función principal
 def verificar_peso():
     if PUERTO_CONFIGURADO is None:
         print("⚠️ Puerto no configurado. Usa modulo2_configuracion.py.")
         return
 
-    # Conexión serial
     while True:
         try:
             ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=1)
@@ -76,10 +70,9 @@ def verificar_peso():
     root.withdraw()
 
     ventana_desconexion = VentanaDesconexion(root)
-    proceso_modulo3 = None  # Proceso activo de modulo3
+    proceso_modulo3 = None
     tiempo_sin_datos = 0
-    intervalo_reconexion = 2  # segundos sin datos antes de mostrar ventana
-    pesos_estables = []
+    intervalo_reconexion = 2
 
     while True:
         root.update()
@@ -97,19 +90,15 @@ def verificar_peso():
                 except ValueError:
                     continue
 
-                # Condición para abrir modulo3 solo si no está activo
+                # ✅ Ejecutar modulo3 inmediatamente si peso >= 300
                 if peso >= 300:
                     if proceso_modulo3 is None or proceso_modulo3.poll() is not None:
                         print(f"🚨 Peso alto detectado: {peso} kg")
                         proceso_modulo3 = ejecutar_modulo3()
                     else:
-                        print("⏳ Esperando que se cierre modulo3...")
-
-                pesos_estables.append(peso)
-                pesos_estables = pesos_estables[-5:]
-
-                if len(pesos_estables) == 5 and all(p < 300 for p in pesos_estables):
-                    print("✅ Peso estable por debajo de 300 kg.")
+                        print("⏳ modulo3 ya está abierto.")
+                else:
+                    print(f"✅ Peso bajo: {peso} kg")
 
             else:
                 tiempo_sin_datos += 1
