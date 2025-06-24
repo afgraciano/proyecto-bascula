@@ -1,57 +1,72 @@
-# simulador_bascula_gui.py
-
 import serial
 import time
-import random
 import tkinter as tk
 import threading
 from datetime import datetime
 
-# Función para generar un peso con el mismo formato de la báscula real
-def generar_linea_formato_bascula():
-    peso = round(random.uniform(10, 100), 2)  # Simular un peso entre 10 y 100 kg
-    peso_formateado = f"{peso:>8}"            # Alinear el número a la derecha (8 espacios)
-    return f"ST,GS,+{peso_formateado}kg\r\n", peso
+# Configuración inicial
+simulando = [False]
+peso_actual = [0.0]
+puerto_simulado = 'COM6'
+velocidad = 9600
+intervalo_envio = 0.25  # segundos
 
-# Función de simulación: escribe al puerto COM y muestra en pantalla
-def iniciar_simulacion(puerto='COM6', velocidad=9600, intervalo=0.25):
+# Genera línea con el formato de la báscula
+def generar_linea_formato_bascula(peso):
+    peso_formateado = f"{peso:>8.2f}"  # Alineado a la derecha con 2 decimales
+    return f"ST,GS,+{peso_formateado}kg\r\n"
+
+# Función que ejecuta la simulación
+def iniciar_simulacion():
     try:
-        ser = serial.Serial(puerto, velocidad)
+        ser = serial.Serial(puerto_simulado, velocidad)
         id_simulado = 1
         while simulando[0]:
-            linea, peso = generar_linea_formato_bascula()
+            linea = generar_linea_formato_bascula(peso_actual[0])
             timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            print(f"id={id_simulado}, peso={peso:.2f}kg, fecha_hora={timestamp}")
+            print(f"id={id_simulado}, peso={peso_actual[0]:.2f}kg, fecha_hora={timestamp}")
             ser.write(linea.encode('utf-8'))
-            time.sleep(intervalo)
+            time.sleep(intervalo_envio)
             id_simulado += 1
         ser.close()
     except Exception as e:
-        print(f"Error al abrir puerto {puerto}: {e}")
+        print(f"Error al abrir puerto {puerto_simulado}: {e}")
 
-# Acción del botón
-def al_presionar_boton():
+# Botón para iniciar/detener
+def al_presionar_boton_simulacion():
     if not simulando[0]:
         simulando[0] = True
         hilo = threading.Thread(target=iniciar_simulacion, daemon=True)
         hilo.start()
-        boton.config(text="Detener Simulación")
+        boton_inicio.config(text="Detener Simulación")
     else:
         simulando[0] = False
-        boton.config(text="Iniciar Simulación")
+        boton_inicio.config(text="Iniciar Simulación")
 
-# Estado de simulación
-simulando = [False]
+# Botones de cambio de peso
+def cambiar_peso(nuevo_peso):
+    peso_actual[0] = nuevo_peso
+    print(f">>> Peso simulado cambiado a {nuevo_peso} kg")
 
-# GUI con Tkinter
+# GUI
 root = tk.Tk()
 root.title("Simulador de Báscula Prometalicos")
 
-tk.Label(root, text="Simula la salida de una báscula en COM6").pack(pady=10)
+tk.Label(root, text="Simulador: salida continua por COM6").pack(pady=10)
 
-boton = tk.Button(root, text="Iniciar Simulación", command=al_presionar_boton)
-boton.pack(pady=20)
+boton_inicio = tk.Button(root, text="Iniciar Simulación", command=al_presionar_boton_simulacion)
+boton_inicio.pack(pady=10)
 
-tk.Label(root, text="Formato: ST,GS,+   XX.XXkg | Intervalo: 0.25 seg").pack(pady=10)
+tk.Label(root, text="Selecciona el peso simulado:").pack(pady=5)
+
+frame_botones = tk.Frame(root)
+frame_botones.pack(pady=5)
+
+tk.Button(frame_botones, text="0 kg", width=10, command=lambda: cambiar_peso(0)).grid(row=0, column=0, padx=5)
+tk.Button(frame_botones, text="500 kg", width=10, command=lambda: cambiar_peso(500)).grid(row=0, column=1, padx=5)
+tk.Button(frame_botones, text="2700 kg", width=10, command=lambda: cambiar_peso(2700)).grid(row=0, column=2, padx=5)
+tk.Button(frame_botones, text="10000 kg", width=10, command=lambda: cambiar_peso(10000)).grid(row=0, column=3, padx=5)
+
+tk.Label(root, text="Formato: ST,GS,+   XXXX.XXkg | Intervalo: 0.25 seg").pack(pady=10)
 
 root.mainloop()
