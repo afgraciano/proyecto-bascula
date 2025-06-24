@@ -1,16 +1,20 @@
 # Importación de módulos necesarios
-import tkinter as tk  # Módulo principal para la GUI
+import tkinter as tk  # Módulo principal para la GUI Para interfaces gráficas
 from tkinter import simpledialog, messagebox  # Para cuadros de diálogo simples y mensajes emergentes
-import socket  # Para la comunicación con el módulo que lee el peso (modulo1)
+import socket  # Para la comunicación con el módulo que lee el peso (modulo1) Comunicación por red local (localhost)
 import json  # Para interpretar los datos recibidos en formato JSON
-from datetime import datetime  # Para registrar fecha y hora
-import re
+from datetime import datetime  # Para Obtener y registrar fecha y hora
+import re  # Validaciones con expresiones regulares
 
 # Diccionario para almacenar pesos temporales de pesajes parciales (por ID)
-pesajes_temporales = {}  # Guarda pesajes en curso por tipo:ID
-pesajes_confirmados = []  # Guarda pesajes finalizados como tuplas (tipo, ID, peso_inicial, peso_final, fecha_ini, fecha_fin)
 
-# Función que se conecta al socket para obtener el peso actual y la hora desde modulo1
+# Diccionario para registrar pesajes iniciales aún sin cerrar
+pesajes_temporales = {}  # Guarda pesajes en curso por tipo:ID  clave: tipo:ID -> (peso, fecha)
+
+# Lista para registrar pesajes ya cerrados
+pesajes_confirmados = []  # Guarda pesajes finalizados con datos de cierre como tuplas (tipo, ID, peso_inicial, peso_final, fecha_ini, fecha_fin)
+
+# Función que se conecta al socket o modulo1 para obtener el peso actual y la hora desde modulo1
 def obtener_datos_peso():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -21,16 +25,105 @@ def obtener_datos_peso():
     except:
         return 0, ""  # Si falla la conexión o algo sale mal, retorna 0 y cadena vacía
 
-# Función principal que construye y ejecuta la ventana de servicio
+# Función principal que construye y ejecuta la ventana de servicio del módulo 3
 def modulo_servicio():
     
     # Función que se ejecuta al hacer clic en uno de los botones de servicio
     def verificar_servicio(tipo):
         peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
 
-        # Si el tipo de servicio es externo, solo se muestra un mensaje
+        # Si el tipo de servicio es externo con subtipos
         if tipo == "Externo":
-            messagebox.showinfo("Servicio", f"Pesaje externo detectado: {peso:.2f} kg", parent=ventana)
+            # Submenú para distinguir tipo de externo
+            subtipos = {
+                "Tercero (pago inmediato)": "Pago inmediato",
+                "Cipreses de Colombia": "Pago mensual",
+                "Núcleos de Madera": "Pago mensual",
+                "Construinmuniza": "Pago mensual"
+            }
+
+            cliente = tk.StringVar(value="")
+            subventana = tk.Toplevel(ventana)
+            subventana.title("Seleccione Cliente Externo")
+            subventana.geometry("300x200")
+            subventana.attributes("-topmost", True)
+            subventana.resizable(False, False)
+            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
+            subventana.overrideredirect(True)
+
+            marco = tk.Frame(subventana, bd=2, relief="ridge")
+            marco.pack(expand=True, fill="both", padx=5, pady=5)
+
+            tk.Label(marco, text="Seleccione el cliente externo:", font=("Arial", 11)).pack(pady=10)
+
+            def seleccionar_cliente(nombre):
+                cliente.set(nombre)
+                subventana.destroy()
+
+            for nombre in subtipos:
+                tk.Button(marco, text=nombre, width=30, command=lambda n=nombre: seleccionar_cliente(n)).pack(pady=3)
+
+            ventana.wait_window(subventana)
+            if not cliente.get():
+                return
+
+            # Paso 1: Solicita placa del vehículo
+            while True:
+                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo:", parent=ventana)
+                if placa is None:
+                    return
+                placa = placa.strip().upper()
+                if re.fullmatch(r'[A-Z]{3}\d{3}( [A-Z0-9]+)?', placa):
+                    break
+                messagebox.showerror("Inválido", "Formato incorrecto. Ej: ABC123 o ABC123 XYZ", parent=ventana)
+
+            id_ingresado = placa  # El ID es la placa (o con sufijo opcional)
+            clave = f"{tipo}:{id_ingresado}"
+            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
+
+            # Solo preguntamos si habrá cierre si NO hay un pesaje inicial guardado
+            if clave in pesajes_temporales:
+                cerrar = True  # Ya hay uno en curso, asumimos que se va a cerrar
+            else:
+                cerrar = messagebox.askyesno("Cierre", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
+
+            if cerrar:
+                if clave in pesajes_temporales:
+                    peso_ini, fecha_ini = pesajes_temporales[clave]
+                    peso_neto = abs(peso - peso_ini)
+                    messagebox.showinfo("Resultado",
+                        f"Cliente: {cliente.get()}\n"
+                        f"Placa: {id_ingresado}\n"
+                        f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
+                        f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
+                        f"Peso Neto: {peso_neto:.2f} kg\n"
+                        f"Tipo de pago: {tipo_pago}", parent=ventana)
+                    pesajes_confirmados.append((tipo, id_ingresado, peso_ini, peso, fecha_ini, fecha_actual))
+                    del pesajes_temporales[clave]
+                else:
+                    pesajes_temporales[clave] = (peso, fecha_actual)
+                    messagebox.showinfo("Pesaje inicial",
+                        f"Peso inicial registrado: {peso:.2f} kg\nPlaca: {id_ingresado}", parent=ventana)
+            else:
+                # Permite ingresar peso de cierre manual
+                fecha_peso_inicial = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Toma fecha del peso leído
+                peso_manual = simpledialog.askstring("Peso cierre manual", "Ingrese el peso de cierre manual (kg) o deje vacío:", parent=ventana)
+                if peso_manual and peso_manual.isdigit():
+                    fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Toma fecha al confirmar el cierre
+                    peso_final = int(peso_manual)
+                    peso_neto = abs(peso_final - peso)
+                    messagebox.showinfo("Pesaje manual",
+                        f"Cliente: {cliente.get()}\n"
+                        f"Placa: {id_ingresado}\n"
+                        f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
+                        f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
+                        f"Peso Neto: {peso_neto:.2f} kg\n"
+                        f"Tipo de pago: {tipo_pago}", parent=ventana)
+                else:
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    messagebox.showinfo("Pesaje registrado",
+                        f"Cliente: {cliente.get()}\nPlaca: {id_ingresado}\nPeso actual: {peso:.2f} kg\nFecha: {fecha_actual}\nTipo de pago: {tipo_pago}", parent=ventana)
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
         elif tipo in ["Inmuniza", "Aserrio"]:
