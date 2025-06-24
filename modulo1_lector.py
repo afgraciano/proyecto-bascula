@@ -1,52 +1,62 @@
 # modulo1_lector.py
+
 import serial
 import time
-import threading
 import os
 import subprocess
 import tkinter as tk
-from tkinter import messagebox
 from config import PUERTO_CONFIGURADO
 
+# Ejecuta el módulo de servicio (modulo3_servicio.py)
 def ejecutar_modulo3():
     ruta_modulo3 = os.path.join(os.path.dirname(__file__), 'modulo3_servicio.py')
     subprocess.Popen(["python", ruta_modulo3], shell=True)
 
-def mostrar_mensaje_desconexion():
-    root = tk.Tk()
-    root.withdraw()
+# Clase para la ventana de desconexión con botones
+class VentanaDesconexion:
+    def __init__(self, root):
+        self.root = root
+        self.ventana = None
+        self.activa = False
+        self.motivo = None
 
-    motivo = tk.StringVar()
+    def mostrar(self):
+        if self.activa:
+            return
+        self.activa = True
 
-    def set_motivo(valor):
-        motivo.set(valor)
-        ventana.quit()
+        self.ventana = tk.Toplevel(self.root)
+        self.ventana.title("Desconexión de báscula")
+        self.ventana.geometry("300x170")
+        self.ventana.resizable(False, False)
+        self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)
 
-    ventana = tk.Toplevel()
-    ventana.title("Desconexión de báscula")
-    ventana.geometry("300x150")
-    ventana.resizable(False, False)
+        label = tk.Label(self.ventana, text="⚠️ Báscula desconectada.\nSeleccione la causa:", font=("Arial", 11))
+        label.pack(pady=10)
 
-    label = tk.Label(ventana, text="⚠️ Báscula desconectada.\nSeleccione la causa:", font=("Arial", 11))
-    label.pack(pady=10)
+        boton1 = tk.Button(self.ventana, text="Corte de energía", width=25, command=lambda: self.set_motivo("Corte de energía"))
+        boton1.pack(pady=5)
 
-    boton1 = tk.Button(ventana, text="Corte de energía", command=lambda: set_motivo("Corte de energía"))
-    boton1.pack(pady=5)
+        boton2 = tk.Button(self.ventana, text="Desconexión de cable", width=25, command=lambda: self.set_motivo("Desconexión de cable"))
+        boton2.pack(pady=5)
 
-    boton2 = tk.Button(ventana, text="Desconexión de cable", command=lambda: set_motivo("Desconexión de cable"))
-    boton2.pack(pady=5)
+    def set_motivo(self, motivo):
+        self.motivo = motivo
+        print(f"📝 Usuario indicó: {motivo}")
+        self.cerrar()
 
-    ventana.protocol("WM_DELETE_WINDOW", lambda: None)  # Evita que cierren la ventana
+    def cerrar(self):
+        if self.ventana and self.ventana.winfo_exists():
+            self.ventana.destroy()
+        self.activa = False
 
-    ventana.mainloop()
-    ventana.destroy()
-    return motivo.get()
-
+# Función principal
 def verificar_peso():
     if PUERTO_CONFIGURADO is None:
         print("⚠️ Puerto no configurado. Usa modulo2_configuracion.py.")
         return
 
+    # Intento de conexión
     while True:
         try:
             ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=1)
@@ -57,75 +67,60 @@ def verificar_peso():
             time.sleep(2)
 
     pesos_estables = []
+    print("▶️ Iniciando monitoreo de la báscula...")
 
-    print("▶️ Esperando datos desde la báscula...")
+    root = tk.Tk()
+    root.withdraw()
 
-    datos_recibidos = False
-    tiempo_ultimo_mensaje = 0
-    intervalo_mensaje = 5  # segundos
-
-    while not datos_recibidos:
-        try:
-            linea = ser.readline().decode('utf-8').strip()
-            if linea:
-                print(f"📥 Primer dato recibido: {linea}")
-                datos_recibidos = True
-                break
-            else:
-                tiempo_actual = time.time()
-                if tiempo_actual - tiempo_ultimo_mensaje >= intervalo_mensaje:
-                    motivo = mostrar_mensaje_desconexion()
-                    print(f"📝 Usuario indicó: {motivo}")
-                    tiempo_ultimo_mensaje = tiempo_actual
-        except serial.SerialException:
-            tiempo_actual = time.time()
-            if tiempo_actual - tiempo_ultimo_mensaje >= intervalo_mensaje:
-                motivo = mostrar_mensaje_desconexion()
-                print(f"📝 Usuario indicó: {motivo}")
-                tiempo_ultimo_mensaje = tiempo_actual
-        time.sleep(1)
-
-    print("▶️ Iniciando lectura continua...")
+    ventana_desconexion = VentanaDesconexion(root)
+    tiempo_sin_datos = 0
+    intervalo_reconexion = 2  # segundos sin datos antes de mostrar ventana
 
     while True:
+        root.update()
+
         try:
             linea = ser.readline().decode('utf-8').strip()
-            if not linea:
-                continue
 
-            print(f"📥 Peso recibido: {linea}")
-            try:
-                peso = float(linea)
-            except ValueError:
-                continue
+            if linea:
+                # Reinicia el temporizador de inactividad
+                tiempo_sin_datos = 0
 
-            if peso >= 300:
-                print(f"🚨 Peso alto detectado: {peso} kg")
-                ejecutar_modulo3()
-                break
+                # Cierra la ventana si estaba abierta
+                ventana_desconexion.cerrar()
 
-            pesos_estables.append(peso)
-            pesos_estables = pesos_estables[-5:]
+                print(f"📥 Peso recibido: {linea}")
+                try:
+                    peso = float(linea)
+                except ValueError:
+                    continue
 
-            if len(pesos_estables) == 5 and all(p < 300 for p in pesos_estables):
-                print("✅ Peso estable por debajo de 300 kg.")
+                if peso >= 300:
+                    print(f"🚨 Peso alto detectado: {peso} kg")
+                    ejecutar_modulo3()
+                    break  # Si quieres que continúe después de abrir módulo3, quita este break
 
-            time.sleep(1)
+                # Mantiene los últimos 5 pesos
+                pesos_estables.append(peso)
+                pesos_estables = pesos_estables[-5:]
+
+                if len(pesos_estables) == 5 and all(p < 300 for p in pesos_estables):
+                    print("✅ Peso estable por debajo de 300 kg.")
+            else:
+                tiempo_sin_datos += 1
+
+                if tiempo_sin_datos >= intervalo_reconexion:
+                    ventana_desconexion.mostrar()
 
         except serial.SerialException:
-            print("❌ Conexión perdida.")
-            break
+            print("❌ Conexión perdida con el puerto.")
+            ventana_desconexion.mostrar()
+            tiempo_sin_datos += 1
+
+        time.sleep(1)
 
     ser.close()
     print("⛔ Finalizando módulo 1.")
 
 if __name__ == "__main__":
-    hilo = threading.Thread(target=verificar_peso)
-    hilo.daemon = True
-    hilo.start()
-
-    try:
-        while hilo.is_alive():
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print("⛔ Interrumpido manualmente.")
+    verificar_peso()
