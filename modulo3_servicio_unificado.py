@@ -5,6 +5,7 @@ import socket  # Para la comunicación con el módulo que lee el peso (modulo1) 
 import json  # Para interpretar los datos recibidos en formato JSON
 from datetime import datetime  # Para Obtener y registrar fecha y hora
 import re  # Validaciones con expresiones regulares
+import unicodedata  # para permitir caracteres o validación de nombres acentuados
 
 # Diccionario para almacenar pesos temporales de pesajes parciales (por ID)
 
@@ -66,8 +67,92 @@ def modulo_servicio():
             ventana.wait_window(subventana)
             if not cliente.get():
                 return
+            
+            tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
+            
+            if cliente.get() == "Tercero (pago inmediato)":
+                # Paso 1:Solicita placa del vehículo (formato LLL111)
+                while True:
+                    placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
+                    if placa is None:
+                        return
+                    placa = placa.strip().upper()
+                    if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
+                        break
+                    messagebox.showerror("Inválido", "Formato de placa incorrecto. Ejemplo válido: ABC123", parent=ventana)
+                
+                # Paso 2: Remisión (opcional)
+                remision = simpledialog.askstring("Remisión", "Ingrese remisión (opcional):", parent=ventana)
+                remision = remision.strip().upper() if remision else ""
+                # aqui concateno placa espacio remision en un id final
+                id_final = f"{placa} {remision}".strip()
 
-            # Paso 1: Solicita placa del vehículo
+                # Paso 3: funcion de Nombre o razón social (obligatorio y con validación)
+                def es_valido_nombre_razon(texto):
+                    # Permite letras (con o sin tilde), números, espacios y puntuación básica
+                    return bool(re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .,'&-]+", texto))
+
+                while True:
+                    razon = simpledialog.askstring("Nombre o Razón social", "Ingrese nombre completo o razón social:", parent=ventana)
+                    if razon and razon.strip():
+                        razon = razon.strip()
+                        if not es_valido_nombre_razon(razon):
+                            messagebox.showerror("Inválido", "El nombre solo debe contener letras, espacios, puntos, comas, apóstrofes o guiones.", parent=ventana)
+                            continue
+                        if razon.isupper():
+                            break  # No tocamos, asumimos que es razón social en siglas
+                        else:
+                            # Capitaliza cada palabra (permite nombres con mayúsculas iniciales)
+                            razon = ' '.join(p.capitalize() for p in razon.split())
+                            break
+                    else:
+                        messagebox.showerror("Campo obligatorio", "Debe ingresar la razón social o nombre válido.", parent=ventana)
+
+                # Paso 4: Cédula o NIT (solo números)
+                while True:
+                    nit = simpledialog.askstring("NIT o Cédula", "Ingrese NIT o Cédula (solo números):", parent=ventana)
+                    if nit and nit.strip():
+                        nit = nit.strip()
+                        if nit.isdigit():
+                            break
+                        else:
+                            messagebox.showerror("Inválido", "Solo se permiten números en la cédula o NIT.", parent=ventana)
+                    else:
+                        messagebox.showerror("Campo obligatorio", "Debe ingresar la cédula o NIT.", parent=ventana)
+
+                # Paso 5: Correo electrónico (opcional y validado)
+                def es_correo_valido(email):
+                    return re.fullmatch(r"[\w\.-]+@[\w\.-]+\.(com|co|net|org|gov|edu(\.[a-z]{2})?|es|info|io|biz|us|mx|ar|cl|ec)", email, re.IGNORECASE)
+
+                while True:
+                    correo = simpledialog.askstring("Correo", "Ingrese correo electrónico (opcional):", parent=ventana)
+                    if correo:
+                        correo = correo.strip()
+                        if es_correo_valido(correo):
+                            break
+                        else:
+                            messagebox.showwarning("Correo inválido", "Formato de correo no válido. Ejemplo válido: usuario@dominio.com.co", parent=ventana)
+                            continue  # volver a pedir
+                    else:
+                        correo = ""
+                        break
+                    
+                # Paso 6: indica fecha actual con hora, minutos y segundos
+                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                # Paso 7: Mensaje tiquete y resultado en pantalla
+                messagebox.showinfo("Resultado",
+                    f"Cliente: {razon}\n"
+                    f"NIT o Cédula: {nit}\n"
+                    f"Correo: {correo}\n"
+                    f"ID: {id_final}\n"
+                    f"Peso actual: {peso:.2f} kg\n"
+                    f"Fecha: {fecha_actual}", parent=ventana)
+                return  # Evita seguir a la lógica de pesajes para terceros
+
+            # Lógica para externos con pago mensual (Cipreses, Núcleos, Construinmuniza)
+            # Solicita placa (con o sin remisión) y pregunta si habrá cierre de pesaje
+
             while True:
                 placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo:", parent=ventana)
                 if placa is None:
@@ -80,8 +165,7 @@ def modulo_servicio():
             id_ingresado = placa  # El ID es la placa (o con sufijo opcional)
             clave = f"{tipo}:{id_ingresado}"
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
-
+            
             # Solo preguntamos si habrá cierre si NO hay un pesaje inicial guardado
             if clave in pesajes_temporales:
                 cerrar = True  # Ya hay uno en curso, asumimos que se va a cerrar
@@ -92,6 +176,7 @@ def modulo_servicio():
                 if clave in pesajes_temporales:
                     peso_ini, fecha_ini = pesajes_temporales[clave]
                     peso_neto = abs(peso - peso_ini)
+                    # Se muestra resultado en pantalla
                     messagebox.showinfo("Resultado",
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
