@@ -4,6 +4,7 @@ from tkinter import simpledialog, messagebox  # Para cuadros de diálogo simples
 import socket  # Para la comunicación con el módulo que lee el peso (modulo1)
 import json  # Para interpretar los datos recibidos en formato JSON
 from datetime import datetime  # Para registrar fecha y hora
+import re
 
 # Diccionario para almacenar pesos temporales de pesajes parciales (por ID)
 pesajes_temporales = {}  # Guarda pesajes en curso por tipo:ID
@@ -33,32 +34,103 @@ def modulo_servicio():
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
         elif tipo in ["Inmuniza", "Aserrio"]:
-            id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:", parent=ventana)  # Pide el ID
-            if not id_ingresado:
-                return  # Si no se ingresa nada, se cancela la operación
-            id_ingresado = id_ingresado.upper()  # convierte todo a mayúsculas
-            clave = f"{tipo}:{id_ingresado}"  # define clave para que el programa funcione correctamente
-            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha y hora actual
+            # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
+            while True:
+                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
 
+                if placa is None:
+                    # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
+                    return
+
+                if placa.strip() == "":
+                    # El usuario presionó "Aceptar" sin escribir → mostrar advertencia
+                    messagebox.showwarning("Campo obligatorio", "Debe ingresar una placa para continuar.", parent=ventana)
+                    continue
+
+                placa = placa.upper()
+                if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
+                    break  # ✅ Formato válido
+                else:
+                    # ❌ Formato incorrecto: mostrar error
+                    messagebox.showerror(
+                        "Formato inválido",
+                        "La placa debe tener 3 letras seguidas de 3 números.\n"
+                        "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n\nEjemplo válido: LLL111",
+                        parent=ventana
+                    )
+
+
+            # Paso 2: Seleccionar RG o MS como empresa
+            empresa = tk.StringVar(value="")  # No hay valor por defecto aún
+
+            subventana = tk.Toplevel(ventana)
+            subventana.title("Seleccione Empresa")
+            subventana.geometry("250x130")
+            subventana.attributes("-topmost", True)
+            subventana.resizable(False, False)
+            subventana.focus_force()
+
+            # Eliminar botones del sistema (cierra y minimiza)
+            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
+            subventana.overrideredirect(True)  # ❌ Oculta bordes y botones (incluyendo minimizar)
+
+            # Fondo con borde simulado (opcional si se usa overrideredirect)
+            marco = tk.Frame(subventana, bd=2, relief="ridge")
+            marco.pack(expand=True, fill="both", padx=5, pady=5)
+
+            tk.Label(marco, text="Seleccione la empresa:", font=("Arial", 11)).pack(pady=10)
+
+            # Función para selección
+            def seleccionar_empresa(valor):
+                empresa.set(valor)
+                subventana.destroy()
+
+            # Botones
+            tk.Button(marco, text="RG", width=10, command=lambda: seleccionar_empresa("RG")).pack(pady=5)
+            tk.Button(marco, text="MS", width=10, command=lambda: seleccionar_empresa("MS")).pack(pady=5)
+
+            # Espera hasta selección
+            ventana.wait_window(subventana)
+
+            # Cancelar si no se seleccionó nada
+            if not empresa.get():
+                return
+
+
+
+            # Paso 3: Ingresar número de remisión (solo dígitos)
+            while True:
+                remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
+                if remision is None:
+                    return
+                if remision.isdigit():
+                    break
+                else:
+                    messagebox.showerror("Inválido", "La remisión debe contener solo números.", parent=ventana)
+
+            # Construir el ID final
+            id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
+            clave = f"{tipo}:{id_ingresado}"
+            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+            # Si ya hay un pesaje inicial con esa clave
             if clave in pesajes_temporales:
-                # Si ya hay un peso inicial registrado para ese ID
                 peso_inicial, fecha_inicial = pesajes_temporales[clave]
-                peso_neto = abs(peso - peso_inicial)  # Se calcula el peso neto y Asegura que el peso neto sea siempre positivo
+                peso_neto = abs(peso - peso_inicial)  # Peso neto siempre positivo
                 messagebox.showinfo("Resultado",
                     f"Pesaje final registrado.\n"
                     f"ID: {id_ingresado}\n"
                     f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
                     f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
                     f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
-
-                    #f"Pesaje final registrado.\nID: {id_ingresado}\nPeso Neto: {peso_neto:.2f} kg\nInicio: {fecha_inicial}\nFin: {fecha_actual}")
                 pesajes_confirmados.append((tipo, id_ingresado, peso_inicial, peso, fecha_inicial, fecha_actual))
-                del pesajes_temporales[clave]  # Elimina el registro temporal
+                del pesajes_temporales[clave]
             else:
-                # Si es el primer pesaje de ese ID, lo guarda
+                # Registrar el pesaje inicial
                 pesajes_temporales[clave] = (peso, fecha_actual)
                 messagebox.showinfo("Pesaje inicial",
-                    f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}")
+                    f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
+
 
         else:
             # Si es "Astillable", simplemente muestra el peso actual
