@@ -83,7 +83,7 @@ def verificar_peso():
 
     while True:
         try:
-            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.05)
+            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.05)# Abrimos el puerto serial con un timeout de 0.05 segundos para equilibrar velocidad y estabilidad
             print(f"✅ Conectado a {PUERTO_CONFIGURADO}")
             break
         except serial.SerialException:
@@ -106,10 +106,11 @@ def verificar_peso():
 
         try:
             raw_line = ser.readline()
-
+            # Si no se recibe nada, incrementar contador y mostrar mensaje solo si supera 0.5s
             if not raw_line:
                 tiempo_sin_datos += 1
-                print("⚠️ Sin datos del COM.")
+                if tiempo_sin_datos >= 30:
+                    print("⚠️ Sin datos del COM.")
             else:
                 try:
                     linea = raw_line.decode('utf-8').strip()
@@ -163,6 +164,7 @@ def verificar_peso():
             ventana_desconexion.mostrar()
             ventana_desconexion.verificar_estado()
 
+        # Pausa de 0.05s entre cada ciclo para evitar sobrecargar CPU y permitir lecturas continuas
         time.sleep(0.05)
 
 if __name__ == "__main__":
