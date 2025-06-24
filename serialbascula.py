@@ -18,17 +18,23 @@ def crear_base_access(path):
         access_engine = win32com.client.Dispatch("Access.Application")
         access_engine.NewCurrentDatabase(path)
         access_engine.Quit()
-    # Conectar e insertar tabla si no existe
+    
+    # Conectar a Access
     conn = pyodbc.connect(f'DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={path};')
     cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS Pesajes (
-            id AUTOINCREMENT PRIMARY KEY,
-            peso TEXT,
-            fecha_hora DATETIME
-        )
-    """)
-    conn.commit()
+
+    # Verificar si la tabla 'Pesajes' ya existe
+    tablas = [row.table_name for row in cursor.tables(tableType='TABLE')]
+    if 'Pesajes' not in tablas:
+        cursor.execute("""
+            CREATE TABLE Pesajes (
+                id AUTOINCREMENT PRIMARY KEY,
+                peso TEXT,
+                fecha_hora DATETIME
+            )
+        """)
+        conn.commit()
+
     cursor.close()
     conn.close()
 
@@ -40,7 +46,7 @@ def iniciar_lectura(puerto, access_path):
         cursor = conn.cursor()
 
         while True:
-            line = ser.readline().decode('utf-8').strip()
+            line = ser.readline().decode('utf-8', errors='ignore').strip()
             if line:
                 peso = line
                 fecha = datetime.now()
