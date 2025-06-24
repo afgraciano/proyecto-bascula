@@ -7,6 +7,7 @@ import subprocess           # Para ejecutar otro script (modulo3)
 import tkinter as tk        # Para la interfaz gráfica
 import re                   # Para extraer peso del texto usando expresiones regulares
 from config import PUERTO_CONFIGURADO  # Puerto configurado desde otro archivo
+import config  # Puerto configurado desde otro archivo
 
 # Función para ejecutar el módulo3 cuando se detecta peso alto
 def ejecutar_modulo3():
@@ -78,7 +79,7 @@ def verificar_peso():
     # Intentar conectar con el puerto configurado
     while True:
         try:
-            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=1)
+            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.1)  # 🔄 Modificado para mayor velocidad de lectura
             print(f"✅ Conectado a {PUERTO_CONFIGURADO}")
             break
         except serial.SerialException:
@@ -99,50 +100,72 @@ def verificar_peso():
         root.update()  # Necesario para que Tkinter procese eventos
 
         try:
-            linea = ser.readline().decode('utf-8').strip()  # Leer una línea del puerto
+            # Leer una línea cruda del puerto
+            raw_line = ser.readline()
 
-            if linea:
-                tiempo_sin_datos = 0         # Reiniciar contador si hay datos
-                ventana_desconexion.cerrar() # Cerrar ventana si estaba activa
-
-                print(f"📥 Peso recibido: {linea}")
-                try:
-                    # Buscar patrón: después de '+' seguido de espacios y números hasta 'kg'
-                    match = re.search(r"[+-]\s*(\d+)\s*kg", linea)
-                    if match:
-                        peso = int(match.group(1))  # Extrae el número como entero
-                    else:
-                        continue  # Si no coincide el patrón, ignorar
-                except Exception as e:
-                    print(f"⚠️ Error al interpretar peso: {e}")
-                    continue   # Ignorar si no es un número válido
-
-                # Ejecutar módulo 3 si el peso es mayor o igual a 300
-                if peso >= 300:
-                    if proceso_modulo3 is None or proceso_modulo3.poll() is not None:
-                        print(f"🚨 Peso alto detectado: {peso} kg")
-                        proceso_modulo3 = ejecutar_modulo3()
-                    else:
-                        print("⏳ modulo3 ya está abierto.")
-                else:
-                    print(f"✅ Peso bajo: {peso} kg")
+            if not raw_line:
+                # Si no se recibió nada, incrementar contador
+                tiempo_sin_datos += 1
+                print("⚠️ Sin datos del COM.")
 
             else:
-                # No se recibió dato, incrementar contador
-                tiempo_sin_datos += 1
+                try:
+                    # Intentar decodificar la línea
+                    linea = raw_line.decode('utf-8').strip()
+                except UnicodeDecodeError:
+                    # Si hay error de codificación, ignorar la línea
+                    print("⚠️ Error de codificación en los datos recibidos.")
+                    tiempo_sin_datos += 1
+                    continue
 
-                # Si se superó el intervalo sin datos, mostrar advertencia
-                if tiempo_sin_datos >= intervalo_reconexion:
-                    ventana_desconexion.mostrar()
-                    ventana_desconexion.verificar_estado()  # Verificar si está minimizada y restaurarla
+                # Validar que la línea contenga el patrón esperado
+                if re.search(r"[+-]\s*\d+\s*kg", linea):
+                    tiempo_sin_datos = 0         # Reiniciar contador si la línea es válida
+                    ventana_desconexion.cerrar() # Cerrar ventana si estaba activa
+
+                    print(f"📥 Peso recibido: {linea}")
+                    try:
+                        # Buscar patrón: después de '+' seguido de espacios y números hasta 'kg'
+                        match = re.search(r"[+-]\s*(\d+)\s*kg", linea)
+                        if match:
+                           if match:
+                            peso = int(match.group(1))  # Extrae el número como entero
+
+                            config.peso_actual = peso   # ✅ Actualiza el valor global para el módulo 3
+                        else:
+                            continue  # Si no coincide el patrón, ignorar
+                    except Exception as e:
+                        print(f"⚠️ Error al interpretar peso: {e}")
+                        continue   # Ignorar si no es un número válido
+
+                    # Ejecutar módulo 3 si el peso es mayor o igual a 300
+                    if peso >= 300:
+                        if proceso_modulo3 is None or proceso_modulo3.poll() is not None:
+                            print(f"🚨 Peso alto detectado: {peso} kg")
+                            proceso_modulo3 = ejecutar_modulo3()
+                        else:
+                            print("⏳ modulo3 ya está abierto.")
+                    else:
+                        print(f"✅ Peso bajo: {peso} kg")
+
+                else:
+                    # Línea recibida no válida o vacía
+                    tiempo_sin_datos += 1
+                    print("⚠️ Línea no válida o vacía recibida.")
 
         except serial.SerialException:
+            # Si se pierde conexión con el puerto
             print("❌ Conexión perdida con el puerto.")
             tiempo_sin_datos += 1
             ventana_desconexion.mostrar()
             ventana_desconexion.verificar_estado()  # Restaurar ventana si está minimizada
 
-        time.sleep(1)  # Esperar 1 segundo antes de la siguiente lectura
+        # Si se superó el intervalo sin datos válidos, mostrar advertencia
+        if tiempo_sin_datos >= intervalo_reconexion:
+            ventana_desconexion.mostrar()
+            ventana_desconexion.verificar_estado()  # Verificar si está minimizada y restaurarla
+
+        time.sleep(0.25)  # 🔄 Modificado para leer 4 veces por segundo
 
     ser.close()  # Cerrar el puerto (nunca se alcanza por el while True)
     print("⛔ Finalizando módulo 1.")

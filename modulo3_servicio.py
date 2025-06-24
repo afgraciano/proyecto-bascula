@@ -41,6 +41,24 @@ def modulo_servicio():
     ventana = tk.Tk()
     ventana.title("Servicio de Báscula")
 
+    # Pantalla que muestra el peso en tiempo real
+    def actualizar_peso():
+        try:
+            peso_label.config(text=f"{config.peso_actual:.2f} kg")
+        except Exception:
+            peso_label.config(text="Error leyendo peso")
+        ventana.after(500, actualizar_peso)  # Actualiza cada 0.5 segundos
+
+    marco_peso = tk.Frame(ventana, bg="white", relief="sunken", bd=2)
+    marco_peso.pack(pady=10, fill="x")
+
+    tk.Label(marco_peso, text="Peso actual (kg):", font=("Arial", 12)).pack()
+    peso_label = tk.Label(marco_peso, text="---", font=("Arial", 24, "bold"), fg="blue")
+    peso_label.pack()
+
+    actualizar_peso()
+
+    # Selección de tipo de servicio
     tk.Label(ventana, text="Tipo de servicio:").pack(pady=5)
     tipo_var = tk.StringVar(value="Externo")
     for tipo in ["Externo", "Inmuniza", "Aserrio", "Astillero"]:
