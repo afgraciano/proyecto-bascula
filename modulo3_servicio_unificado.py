@@ -24,7 +24,26 @@ def obtener_datos_peso():
             resultado = json.loads(data.decode())  # Decodifica el JSON recibido
             return resultado.get("peso", 0), resultado.get("timestamp", "")
     except:
-        return 0, ""  # Si falla la conexión o algo sale mal, retorna 0 y cadena vacía
+        return 0, "" 
+    
+# Función para confirmar o permitir ingreso manual si el peso es bajo
+def confirmar_o_pedir_peso(peso, ventana):
+    if peso <= 10:
+        decision = messagebox.askyesno(
+            "Cierre con peso bajo",
+            f"El peso actual es {peso:.2f} kg.\n¿Desea cerrar con este peso presione Si o ingresar un peso manual presione no?",
+            parent=ventana
+        )
+        if not decision:
+            # Permitir ingreso manual
+            peso_manual = simpledialog.askstring("Peso cierre manual", "Ingrese el peso final (kg):", parent=ventana)
+            if peso_manual and peso_manual.strip().isdigit():
+                return int(peso_manual.strip())
+            else:
+                messagebox.showwarning("Cancelado", "No se ingresó peso válido. Operación cancelada.", parent=ventana)
+                return None
+    return peso
+ # Si falla la conexión o algo sale mal, retorna 0 y cadena vacía
 
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3
 def modulo_servicio():
@@ -91,14 +110,21 @@ def modulo_servicio():
                 id_final = f"{placa} {remision}".strip()
                 # ingreso en variable clave el tipo y id final
                 clave = f"{tipo}:{cliente.get()}:{id_final}"
-                #clave = f"{tipo}:{id_final}"
-                # agrego fecha actual con hora, minutos y segundos
-                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                
 
                 # 🔁 Si ya hay un pesaje iniciado, hacemos el cierre automáticamente
                 if clave in pesajes_temporales:
                     peso_ini, fecha_ini, razon, nit, correo = pesajes_temporales[clave]
-                    peso_neto = abs(peso - peso_ini)
+                    #hago llamada de la funcion confirmar o pedir peso
+                    peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+                    if peso_confirmado is None:
+                        return
+                    peso = peso_confirmado
+                    # agrego fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                    peso_neto = abs(peso - peso_ini) #resta de los pesos y resultado simpre positivo
                     # Mensaje tiquete y resultado en pantalla
                     messagebox.showinfo("Pesaje cerrado",
                         f"Cliente: {razon}\n"
@@ -167,8 +193,10 @@ def modulo_servicio():
                 
                 # Paso 6: Preguntar si tendrá cierre
                 cerrar = messagebox.askyesno("Cierre", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
-
+                
                 if cerrar:
+                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     # 🔁 Se registra como pesaje inicial
                     pesajes_temporales[clave] = (peso, fecha_actual, razon, nit, correo)
                     messagebox.showinfo("Pesaje inicial",
@@ -183,6 +211,7 @@ def modulo_servicio():
                         peso_final = int(peso_manual.strip())
                         fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Después de confirmarlo y escribir peso final Toma fecha al cierre
                         peso_neto = abs(peso_final - peso)
+                        # Mensaje tiquete y resultado en pantalla
                         messagebox.showinfo("Pesaje manual",
                             f"Cliente: {razon}\n"
                             f"NIT: {nit}\n"
@@ -193,6 +222,8 @@ def modulo_servicio():
                             f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
                         pesajes_confirmados.append((tipo, id_final, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
                     else:
+                        # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                        fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         #Solo muestra el peso actual si no se ingresó cierre manual
                         messagebox.showinfo("Pesaje registrado",
                             f"Cliente: {razon}\n"
@@ -223,9 +254,9 @@ def modulo_servicio():
             else:
                 id_ingresado = placa
 
-            #clave = f"{tipo}:{id_ingresado}"
+            
             clave = f"{tipo}:{cliente.get()}:{id_ingresado}"
-            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             
             # Solo preguntamos si habrá cierre si NO hay un pesaje inicial guardado
             if clave in pesajes_temporales:
@@ -234,9 +265,19 @@ def modulo_servicio():
                 cerrar = messagebox.askyesno("Cierre", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
 
             if cerrar:
+                ## agrego fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                #fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
                 if clave in pesajes_temporales:
                     peso_ini, fecha_ini = pesajes_temporales[clave]
-                    peso_neto = abs(peso - peso_ini)
+                    peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+                    if peso_confirmado is None:
+                        return
+                    peso = peso_confirmado
+                    
+                    peso_neto = abs(peso - peso_ini)#resta de los pesos y resultado simpre positivo
+                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     # Se muestra resultado en pantalla
                     messagebox.showinfo("Resultado",
                         f"Cliente: {cliente.get()}\n"
@@ -248,6 +289,8 @@ def modulo_servicio():
                     pesajes_confirmados.append((tipo, id_ingresado, peso_ini, peso, fecha_ini, fecha_actual))
                     del pesajes_temporales[clave]
                 else:
+                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     pesajes_temporales[clave] = (peso, fecha_actual)
                     messagebox.showinfo("Pesaje inicial",
                         f"Peso inicial registrado: {peso:.2f} kg\nPlaca: {id_ingresado}", parent=ventana)
@@ -259,6 +302,7 @@ def modulo_servicio():
                     fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Toma fecha al confirmar el cierre
                     peso_final = int(peso_manual)
                     peso_neto = abs(peso_final - peso)
+                    # Mensaje tiquete y resultado en pantalla
                     messagebox.showinfo("Pesaje manual",
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
@@ -267,6 +311,7 @@ def modulo_servicio():
                         f"Peso Neto: {peso_neto:.2f} kg\n"
                         f"Tipo de pago: {tipo_pago}", parent=ventana)
                 else:
+                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     messagebox.showinfo("Pesaje registrado",
                         f"Cliente: {cliente.get()}\nPlaca: {id_ingresado}\nPeso actual: {peso:.2f} kg\nFecha: {fecha_actual}\nTipo de pago: {tipo_pago}", parent=ventana)
@@ -350,12 +395,22 @@ def modulo_servicio():
             # Construir el ID final
             id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
             clave = f"{tipo}:{id_ingresado}"
-            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
             
             # Verificamos Si ya hay un pesaje abierto con esta clave, cerrar directamente sin volver a preguntar
             if clave in pesajes_temporales:
                 peso_inicial, fecha_inicial = pesajes_temporales[clave]  # Recupera datos
+                peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+                if peso_confirmado is None:
+                    return
+                peso = peso_confirmado
+                
                 peso_neto = abs(peso - peso_inicial)  # Calcula el peso neto
+
+                # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+                # Mensaje tiquete y resultado en pantalla
                 messagebox.showinfo("Resultado",
                     f"Pesaje final registrado.\n"
                     f"{tipo}:\nID: {id_ingresado}\n"
@@ -371,6 +426,8 @@ def modulo_servicio():
 
             # Si el servicio tendrá cierre de pesaje
             if cerrar:
+                # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 pesajes_temporales[clave] = (peso, fecha_actual)  # Registra pesaje inicial
                 messagebox.showinfo("Pesaje inicial",
                     f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
@@ -382,6 +439,7 @@ def modulo_servicio():
                     peso_final = int(peso_manual.strip())  # Convierte a entero
                     fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha final
                     peso_neto = abs(peso_final - peso)  # Calcula neto
+                    # Mensaje tiquete y resultado en pantalla
                     messagebox.showinfo("Pesaje manual",
                         f"{tipo}:\nID: {id_ingresado}\n"
                         f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
@@ -389,6 +447,8 @@ def modulo_servicio():
                         f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
                     pesajes_confirmados.append((tipo, id_ingresado, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
                 else:
+                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
+                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     # Si no se ingresó peso final manual, solo muestra registro actual
                     messagebox.showinfo("Pesaje registrado",
                         f"{tipo}:\nID: {id_ingresado}\nPeso actual: {peso:.2f} kg\nFecha: {fecha_actual}", parent=ventana)
@@ -466,6 +526,7 @@ def modulo_servicio():
             
             # Construir el ID final
             id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
+            # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
             # Mensaje resultado final impreso en pantalla de astillable
