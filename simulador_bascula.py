@@ -1,37 +1,57 @@
-# simulador_bascula.py
+# simulador_bascula_gui.py
+
 import serial
 import time
 import random
+import tkinter as tk
+import threading
+from datetime import datetime
 
-# Puerto COM virtual que emula la báscula
-puerto_salida = 'COM3'  # Debe ser uno del par creado con com0com
+# Función para generar un peso con el mismo formato de la báscula real
+def generar_linea_formato_bascula():
+    peso = round(random.uniform(10, 100), 2)  # Simular un peso entre 10 y 100 kg
+    peso_formateado = f"{peso:>8}"            # Alinear el número a la derecha (8 espacios)
+    return f"ST,GS,+{peso_formateado}kg\r\n", peso
 
-ser = serial.Serial(puerto_salida, 9600)
+# Función de simulación: escribe al puerto COM y muestra en pantalla
+def iniciar_simulacion(puerto='COM6', velocidad=9600, intervalo=0.25):
+    try:
+        ser = serial.Serial(puerto, velocidad)
+        id_simulado = 1
+        while simulando[0]:
+            linea, peso = generar_linea_formato_bascula()
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            print(f"id={id_simulado}, peso={peso:.2f}kg, fecha_hora={timestamp}")
+            ser.write(linea.encode('utf-8'))
+            time.sleep(intervalo)
+            id_simulado += 1
+        ser.close()
+    except Exception as e:
+        print(f"Error al abrir puerto {puerto}: {e}")
 
-try:
-    while True:
-        peso = round(random.uniform(10.0, 100.0), 2)
-        ser.write(f"{peso}\r\n".encode('utf-8'))
-        time.sleep(0.25)  # Cada 250 ms, como la báscula real
-except KeyboardInterrupt:
-    ser.close()
+# Acción del botón
+def al_presionar_boton():
+    if not simulando[0]:
+        simulando[0] = True
+        hilo = threading.Thread(target=iniciar_simulacion, daemon=True)
+        hilo.start()
+        boton.config(text="Detener Simulación")
+    else:
+        simulando[0] = False
+        boton.config(text="Iniciar Simulación")
 
+# Estado de simulación
+simulando = [False]
 
+# GUI con Tkinter
+root = tk.Tk()
+root.title("Simulador de Báscula Prometalicos")
 
-# simulador_bascula.py
-import serial
-import time
-import random
+tk.Label(root, text="Simula la salida de una báscula en COM6").pack(pady=10)
 
-# Abre el puerto COM6 (emisor virtual)
-ser = serial.Serial('COM6', 9600)
+boton = tk.Button(root, text="Iniciar Simulación", command=al_presionar_boton)
+boton.pack(pady=20)
 
-try:
-    while True:
-        peso = round(random.uniform(10.0, 100.0), 2)  # Simula peso entre 10 y 100 kg
-        ser.write(f"{peso}\n".encode('utf-8'))        # Envía como si fuera la báscula
-        print(f"Enviado: {peso}")
-        time.sleep(0.25)  # Enviar 4 veces por segundo
-except KeyboardInterrupt:
-    ser.close()
-    print("Simulación terminada.")
+tk.Label(root, text="Formato: ST,GS,+   XX.XXkg | Intervalo: 0.25 seg").pack(pady=10)
+
+root.mainloop()
