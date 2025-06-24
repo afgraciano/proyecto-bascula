@@ -1,23 +1,22 @@
-import serial
-import time
-import os
-import subprocess
-import tkinter as tk
-import re
-import socket
-import json
+import serial               # Comunicación con puerto serial
+import time                 # Delays y manejo de tiempos
+import os                   # Rutas de archivo
+import subprocess           # Ejecutar procesos externos
+import tkinter as tk        # Interfaz gráfica
+import re                   # Expresiones regulares para extraer peso
+import socket               # Comunicación de red local
+import json                 # Para formatear datos transmitidos
 from datetime import datetime
 from config import PUERTO_CONFIGURADO
 import config
-import ctypes
-import threading
+import threading            # Hilos para multitarea
 
-# Ejecuta módulo3 como un nuevo proceso si se detecta peso alto
+# Ejecuta módulo 3 en un nuevo proceso
 def ejecutar_modulo3():
     ruta_modulo3 = os.path.join(os.path.dirname(__file__), 'modulo3_servicio_unificado.py')
     return subprocess.Popen(["python", ruta_modulo3], shell=True)
 
-# Alerta por desconexión
+# Clase que muestra alerta de desconexión si no se recibe dato
 class VentanaDesconexion:
     def __init__(self, root):
         self.root = root
@@ -59,7 +58,36 @@ class VentanaDesconexion:
                 self.ventana.lift()
                 self.ventana.focus_force()
 
-# Servidor socket que entrega peso y timestamp
+# Nueva clase para mostrar alerta de sobrepeso sin bloquear el hilo
+class VentanaAlertaPeso:
+    def __init__(self, root):
+        self.root = root  # Aunque guardamos root, no lo usaremos como padre para que no quede debajo de otras ventanas
+        self.ventana = None
+
+    def mostrar(self, peso):
+        # Solo mostrar si no existe ya una ventana activa
+        if self.ventana is None or not self.ventana.winfo_exists():
+            self.ventana = tk.Toplevel()  # ❌ No usar self.root como padre para que sea totalmente independiente
+            self.ventana.title("¡Peso Excesivo!")
+            self.ventana.geometry("350x100")
+            self.ventana.resizable(False, False)
+
+            self.ventana.attributes("-topmost", True)  # 🟢 Siempre al frente
+            self.ventana.lift()                        # 🟢 Traer al frente explícitamente
+            self.ventana.focus_force()                 # 🟢 Darle foco para evitar quedar oculta
+
+            self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)  # Desactiva cierre manual
+
+            # Etiqueta con mensaje de peso alto
+            tk.Label(self.ventana,
+                     text=f"⚠️ Peso actual: {peso} kg\nSupera los 80,000 kg",
+                     font=("Arial", 12)).pack(pady=20)
+
+    def cerrar(self):
+        # Cierra la ventana si existe
+        if self.ventana and self.ventana.winfo_exists():
+            self.ventana.destroy()
+# Servidor socket para enviar el peso actual al módulo 3
 def iniciar_socket():
     HOST = "127.0.0.1"
     PORT = 5000
@@ -75,15 +103,16 @@ def iniciar_socket():
                 respuesta = {"peso": config.peso_actual, "timestamp": now}
                 conn.sendall(json.dumps(respuesta).encode())
 
-# Función principal de monitoreo de peso y alerta
+# Lógica principal: lectura de puerto y manejo de eventos
 def verificar_peso():
     if PUERTO_CONFIGURADO is None:
         print("⚠️ Puerto no configurado. Usa modulo2_configuracion.py.")
         return
 
+    # Conexión al puerto
     while True:
         try:
-            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.05)# Abrimos el puerto serial con un timeout de 0.05 segundos para equilibrar velocidad y estabilidad
+            ser = serial.Serial(PUERTO_CONFIGURADO, 9600, timeout=0.05)
             print(f"✅ Conectado a {PUERTO_CONFIGURADO}")
             break
         except serial.SerialException:
@@ -93,23 +122,22 @@ def verificar_peso():
     print("▶️ Iniciando monitoreo de la báscula...")
 
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw()  # Oculta ventana principal
 
     ventana_desconexion = VentanaDesconexion(root)
+    ventana_alerta_peso = VentanaAlertaPeso(root)  # Alerta por sobrepeso
     proceso_modulo3 = None
     tiempo_sin_datos = 0
-    intervalo_reconexion = 30  # espera 1.5s antes de lanzar advertencia
-    alerta_mostrada = False
+    intervalo_reconexion = 30  # tolerancia 1.5s
 
     while True:
         root.update()
 
         try:
             raw_line = ser.readline()
-            # Si no se recibe nada, incrementar contador y mostrar mensaje solo si supera 0.5s
             if not raw_line:
                 tiempo_sin_datos += 1
-                if tiempo_sin_datos >= 30:  # espera 1.5s sin datos válidos
+                if tiempo_sin_datos >= intervalo_reconexion:
                     print("⚠️ Sin datos del COM.")
             else:
                 try:
@@ -128,18 +156,13 @@ def verificar_peso():
                         peso = int(match.group(1))
                         config.peso_actual = peso
 
-                        # ALERTA si peso ≥ 80000
-                        if peso >= 80000 and not alerta_mostrada:
-                            alerta_mostrada = True
-                            print("🚨 ¡ALERTA! Peso máximo superado.")
-                            ctypes.windll.user32.MessageBoxW(0,
-                                f"El peso actual ({peso} kg) supera el límite de 80,000 kg.",
-                                "¡Peso excesivo!", 0x30)
-                        elif peso < 80000:
-                            alerta_mostrada = False
-                        
+                        # Mostrar alerta si sobrepasa 80000, cerrar si baja
+                        if peso >= 80000:
+                            ventana_alerta_peso.mostrar(peso)
+                        else:
+                            ventana_alerta_peso.cerrar()
 
-                        # Ejecutar módulo 3 si peso ≥ 300
+                        # Abrir módulo 3 si peso ≥ 300
                         if peso >= 300:
                             if proceso_modulo3 is None or proceso_modulo3.poll() is not None:
                                 print(f"🚨 Peso alto detectado: {peso} kg")
@@ -148,9 +171,6 @@ def verificar_peso():
                                 print("⏳ modulo3 ya está abierto.")
                         else:
                             print(f"✅ Peso bajo: {peso} kg")
-                    else:
-                        tiempo_sin_datos += 1
-                        print("⚠️ Patrón de peso no detectado.")
                 else:
                     tiempo_sin_datos += 1
                     print("⚠️ Línea no válida o vacía recibida.")
@@ -165,9 +185,9 @@ def verificar_peso():
             ventana_desconexion.mostrar()
             ventana_desconexion.verificar_estado()
 
-        # Pausa de 0.05s entre cada ciclo para evitar sobrecargar CPU y permitir lecturas continuas
         time.sleep(0.05)
 
+# Punto de entrada
 if __name__ == "__main__":
     threading.Thread(target=iniciar_socket, daemon=True).start()
     verificar_peso()
