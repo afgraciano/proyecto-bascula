@@ -98,7 +98,7 @@ def verificar_peso():
     ventana_desconexion = VentanaDesconexion(root)
     proceso_modulo3 = None
     tiempo_sin_datos = 0
-    intervalo_reconexion = 2
+    intervalo_reconexion = 30  # espera 1.5s antes de lanzar advertencia
     alerta_mostrada = False
 
     while True:
@@ -109,7 +109,7 @@ def verificar_peso():
             # Si no se recibe nada, incrementar contador y mostrar mensaje solo si supera 0.5s
             if not raw_line:
                 tiempo_sin_datos += 1
-                if tiempo_sin_datos >= 30:
+                if tiempo_sin_datos >= 30:  # espera 1.5s sin datos válidos
                     print("⚠️ Sin datos del COM.")
             else:
                 try:
@@ -137,6 +137,7 @@ def verificar_peso():
                                 "¡Peso excesivo!", 0x30)
                         elif peso < 80000:
                             alerta_mostrada = False
+                        
 
                         # Ejecutar módulo 3 si peso ≥ 300
                         if peso >= 300:
