@@ -210,9 +210,10 @@ def modulo_servicio():
             if clave in pesajes_temporales:
                 peso_inicial, fecha_inicial = pesajes_temporales[clave]
                 peso_neto = abs(peso - peso_inicial)  # Peso neto siempre positivo
+                # Mensaje resultado final impreso en pantalla de Inmuniza o Aserrio
                 messagebox.showinfo("Resultado",
                     f"Pesaje final registrado.\n"
-                    f"ID: {id_ingresado}\n"
+                    f"{tipo}:\n ID: {id_ingresado}\n"
                     f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
                     f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
                     f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
@@ -224,10 +225,85 @@ def modulo_servicio():
                 messagebox.showinfo("Pesaje inicial",
                     f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
 
+        # Solicita los mismos datos que Inmuniza/Aserrio, pero solo imprime peso actual
+        elif tipo == "Astillable":
+            # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
+            while True:
+                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
+                if placa is None:
+                    # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
+                    return
+                if placa.strip() == "":
+                    # El usuario presionó "Aceptar" sin escribir → mostrar advertencia
+                    messagebox.showwarning("Campo obligatorio", "Debe ingresar una placa.", parent=ventana)
+                    continue
+                placa = placa.upper()
+                if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
+                    break# ✅ Formato válido
+                else:
+                    # ❌ Formato incorrecto: mostrar error
+                    messagebox.showerror(
+                        "Formato inválido",
+                        "La placa debe tener 3 letras seguidas de 3 números.\n"
+                        "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n\nEjemplo válido: LLL111",
+                        parent=ventana
+                    )
+            # Paso 2: Seleccionar RG o MS como empresa      
+            empresa = tk.StringVar(value="")  # No hay valor por defecto aún
 
-        else:
-            # Si es "Astillable", simplemente muestra el peso actual
-            messagebox.showinfo("Astillable", f"Peso actual mostrado: {peso:.2f} kg", parent=ventana)
+            subventana = tk.Toplevel(ventana)
+            subventana.title("Seleccione Empresa")
+            subventana.geometry("250x130")
+            subventana.attributes("-topmost", True)
+            subventana.resizable(False, False)
+            
+            # Eliminar botones del sistema (cierra y minimiza)
+            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
+            subventana.overrideredirect(True)  # ❌ Oculta bordes y botones (incluyendo minimizar)
+
+            # Fondo con borde simulado (opcional si se usa overrideredirect)
+            marco = tk.Frame(subventana, bd=2, relief="ridge")
+            marco.pack(expand=True, fill="both", padx=5, pady=5)
+
+            tk.Label(marco, text="Seleccione la empresa:", font=("Arial", 11)).pack(pady=10)
+            
+            # Función para selección
+            def seleccionar_empresa(valor):
+                empresa.set(valor)
+                subventana.destroy()
+
+            # Botones
+            tk.Button(marco, text="RG", width=10, command=lambda: seleccionar_empresa("RG")).pack(pady=5)
+            tk.Button(marco, text="MS", width=10, command=lambda: seleccionar_empresa("MS")).pack(pady=5)
+            
+            # Espera hasta selección
+            ventana.wait_window(subventana)
+
+            # Cancelar si no se seleccionó nada
+            if not empresa.get():
+                return
+
+            
+            # Paso 3: Ingresar número de remisión (solo dígitos)
+            while True:
+                remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
+                if remision is None:
+                    return
+                if remision.isdigit():
+                    break
+                else:
+                    messagebox.showerror("Inválido", "La remisión debe contener solo números.", parent=ventana)
+
+            
+            # Construir el ID final
+            id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
+            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Mensaje resultado final impreso en pantalla de astillable
+            messagebox.showinfo("Resultado",
+                f"Pesaje final registrado.\n"
+                f"{tipo}:\n ID: {id_ingresado}\n"
+                f"Peso: {peso:.2f} kg\nFecha: {fecha_actual}", parent=ventana)
 
     # Función que actualiza constantemente el peso en la GUI
     def actualizar_peso_gui():
