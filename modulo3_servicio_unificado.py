@@ -35,19 +35,19 @@ def modulo_servicio():
             id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:", parent=ventana)  # Pide el ID
             if not id_ingresado:
                 return  # Si no se ingresa nada, se cancela la operación
-            id_ingresado = id_ingresado.upper()  # convierte todo a mayúsculas
+
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha y hora actual
 
-            if id_ingresado in pesajes_temporales:
+            if clave in pesajes_temporales:
                 # Si ya hay un peso inicial registrado para ese ID
-                peso_inicial, fecha_inicial = pesajes_temporales[id_ingresado]
+                peso_inicial, fecha_inicial = pesajes_temporales[clave]
                 peso_neto = peso - peso_inicial  # Se calcula el peso neto
                 messagebox.showinfo("Resultado",
                     f"Pesaje final registrado.\nID: {id_ingresado}\nPeso Neto: {peso_neto:.2f} kg\nInicio: {fecha_inicial}\nFin: {fecha_actual}")
-                del pesajes_temporales[id_ingresado]  # Elimina el registro temporal
+                del pesajes_temporales[clave]  # Elimina el registro temporal
             else:
                 # Si es el primer pesaje de ese ID, lo guarda
-                pesajes_temporales[id_ingresado] = (peso, fecha_actual)
+                pesajes_temporales[clave] = (peso, fecha_actual)
                 messagebox.showinfo("Pesaje inicial",
                     f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}")
 
