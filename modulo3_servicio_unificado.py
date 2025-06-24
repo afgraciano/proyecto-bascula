@@ -28,14 +28,14 @@ def modulo_servicio():
 
         # Si el tipo de servicio es externo, solo se muestra un mensaje
         if tipo == "Externo":
-            messagebox.showinfo("Servicio", f"Pesaje externo detectado: {peso:.2f} kg")
+            messagebox.showinfo("Servicio", f"Pesaje externo detectado: {peso:.2f} kg", parent=ventana)
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
         elif tipo in ["Inmuniza", "Aserrio"]:
-            id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:")  # Pide el ID
+            id_ingresado = simpledialog.askstring("ID", "Ingrese el ID del pesaje:", parent=ventana)  # Pide el ID
             if not id_ingresado:
                 return  # Si no se ingresa nada, se cancela la operación
-
+            id_ingresado = id_ingresado.upper()  # convierte todo a mayúsculas
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha y hora actual
 
             if id_ingresado in pesajes_temporales:
@@ -53,7 +53,7 @@ def modulo_servicio():
 
         else:
             # Si es "Astillero", simplemente muestra el peso actual
-            messagebox.showinfo("Astillero", f"Peso actual mostrado: {peso:.2f} kg")
+            messagebox.showinfo("Astillero", f"Peso actual mostrado: {peso:.2f} kg", parent=ventana)
 
     # Función que actualiza constantemente el peso en la GUI
     def actualizar_peso_gui():
