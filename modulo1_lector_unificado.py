@@ -7,15 +7,17 @@ import re
 import socket
 import json
 import threading
+import signal
 from datetime import datetime
 from config import PUERTO_CONFIGURADO
 import config
 import psutil  # ✅ Para verificar si el proceso aún está vivo
+from estado_pesajes import pesajes_temporales
 
 # Ejecuta módulo 3
 def ejecutar_modulo3():
     ruta_modulo3 = os.path.join(os.path.dirname(__file__), 'modulo3_servicio_unificado.py')
-    return subprocess.Popen(["python", ruta_modulo3], shell=True)
+    return subprocess.Popen(["python", ruta_modulo3])
 
 # Verifica si el proceso aún está vivo
 def proceso_activo(proceso):
@@ -173,15 +175,44 @@ def verificar_peso():
                             ventana_alerta_peso.mostrar(peso)
                         else:
                             ventana_alerta_peso.cerrar()
-                        #verificamos si el peso es mayor a 300 para abrir el modulo 3
-                        if peso >= 300:
-                            if proceso_modulo3 is None or proceso_modulo3.poll() is not None or not psutil.pid_exists(proceso_modulo3.pid):
-                                print(f"🚨 Peso alto detectado: {peso} kg")
+                        
+                        # Verifica si debe abrir o cerrar el módulo 3 con base en peso y pesajes abiertos
+                        def hay_pesajes_abiertos():
+                            try:
+                                with open('estado_actual_pesajes.json', 'r') as f:
+                                    claves = json.load(f)
+                                    return bool(claves)
+                            except:
+                                return False
+
+                
+                        hay_pesaje_abierto = hay_pesajes_abiertos()
+
+                        if peso >= 300 or hay_pesaje_abierto:
+                            if proceso_modulo3 is None or not proceso_activo(proceso_modulo3):
+                                print(f"🚨 Activando módulo3 (peso={peso} kg, pesajes_abiertos={hay_pesaje_abierto})")
                                 proceso_modulo3 = ejecutar_modulo3()
                             else:
                                 print("⏳ módulo3 ya está abierto.")
-                        else:
-                            print(f"✅ Peso bajo: {peso} kg")
+                        elif peso < 10 and not hay_pesaje_abierto:
+                            if proceso_modulo3 and proceso_activo(proceso_modulo3):
+                                print("🟡 Cerrando módulo3 (peso < 10 kg y sin pesajes abiertos)")
+                                try:
+                                    proceso_modulo3.terminate()
+                                    time.sleep(1)  # Espera breve para cerrar
+                                    if proceso_activo(proceso_modulo3):
+                                        print("⚠️ Terminate no fue suficiente, forzando kill()")
+                                        proceso_modulo3.kill()
+                                    else:
+                                        print("✅ módulo3 cerrado correctamente")
+                                except Exception as e:
+                                    print(f"❌ Error al cerrar módulo3: {e}")
+                                proceso_modulo3 = None
+                            else:
+                                print(f"✅ Peso bajo y sin pesajes abiertos ({peso} kg)")
+
+
+
                 else:
                     tiempo_sin_datos += 1
                     print("⚠️ Línea no válida o vacía recibida.")

@@ -9,11 +9,21 @@ import unicodedata  # para permitir caracteres o validación de nombres acentuad
 
 # Diccionario para almacenar pesos temporales de pesajes parciales (por ID)
 
-# Diccionario para registrar pesajes iniciales aún sin cerrar
-pesajes_temporales = {}  # Guarda pesajes en curso por tipo:ID  clave: tipo:ID -> (peso, fecha)
+# Se importan los diccionarios globales que almacenan pesajes abiertos y cerrados del archivo estado_pesajes.py
+# para permitir el acceso y actualización compartida entre módulos (como módulo1 y módulo3)
+from estado_pesajes import pesajes_temporales, pesajes_confirmados
+import json
+import os
 
-# Lista para registrar pesajes ya cerrados
-pesajes_confirmados = []  # Guarda pesajes finalizados con datos de cierre como tuplas (tipo, ID, peso_inicial, peso_final, fecha_ini, fecha_fin)
+#definio funcion para actualizar el estado del pesaje que se comparte con el modulo 1 y lo indico cada que agrego o elimino pesaje en pesajes_temporales
+def actualizar_estado_pesajes():
+    ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
+    try:
+        with open(ruta, 'w') as f:
+            json.dump(list(pesajes_temporales.keys()), f)
+    except Exception as e:
+        print(f"❌ Error al guardar estado de pesajes: {e}")
+
 
 # Función que se conecta al socket o modulo1 para obtener el peso actual y la hora desde modulo1
 def obtener_datos_peso():
@@ -136,6 +146,7 @@ def modulo_servicio():
                         f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
                     pesajes_confirmados.append((tipo, id_final, peso_ini, peso, fecha_ini, fecha_actual))
                     del pesajes_temporales[clave]
+                    actualizar_estado_pesajes()  # actualiza pesaje eliminado de pesajes abiertos
                     return  # Salimos porque ya hicimos el cierre
 
                 # 🔁 Si no hay pesaje previo, solicitamos los demás datos
@@ -288,10 +299,12 @@ def modulo_servicio():
                         f"Tipo de pago: {tipo_pago}", parent=ventana)
                     pesajes_confirmados.append((tipo, id_ingresado, peso_ini, peso, fecha_ini, fecha_actual))
                     del pesajes_temporales[clave]
+                    actualizar_estado_pesajes()  # actualiza la eliminacion de pesajes abiertos
                 else:
                     # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     pesajes_temporales[clave] = (peso, fecha_actual)
+                    actualizar_estado_pesajes()  # actualiza agregar pesajes abiertos
                     messagebox.showinfo("Pesaje inicial",
                         f"Peso inicial registrado: {peso:.2f} kg\nPlaca: {id_ingresado}", parent=ventana)
             else:
@@ -419,6 +432,7 @@ def modulo_servicio():
                     f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
                 pesajes_confirmados.append((tipo, id_ingresado, peso_inicial, peso, fecha_inicial, fecha_actual))
                 del pesajes_temporales[clave]  # Elimina de pesajes abiertos
+                actualizar_estado_pesajes()  # actualiza la Eliminacion de pesajes abiertos
                 return  # Finaliza la ejecución
 
             # Paso 4: Preguntar si tendrá cierre (solo si no hay pesaje previo abierto)
@@ -429,6 +443,7 @@ def modulo_servicio():
                 # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                 fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 pesajes_temporales[clave] = (peso, fecha_actual)  # Registra pesaje inicial
+                actualizar_estado_pesajes()  # actualizo inicio de pesajes abiertos
                 messagebox.showinfo("Pesaje inicial",
                     f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
             else:
@@ -583,4 +598,17 @@ def modulo_servicio():
 
 # Si el archivo se ejecuta directamente, se lanza la función de servicio
 if __name__ == "__main__":
-    modulo_servicio()
+    import signal
+    import sys
+
+    def cerrar_gracioso(sig, frame):
+        print("🔴 Señal de terminación recibida. Cerrando ventana de báscula...")
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, cerrar_gracioso)
+    signal.signal(signal.SIGINT, cerrar_gracioso)  # Ctrl+C, por si acaso
+
+    try:
+        modulo_servicio()
+    except Exception as e:
+        print(f"⛔ módulo3 cerrado por excepción: {e}")
