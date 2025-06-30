@@ -5,7 +5,6 @@ import subprocess
 import tkinter as tk
 import re
 import socket
-import json
 import threading
 import signal
 from datetime import datetime
@@ -13,6 +12,7 @@ from config import PUERTO_CONFIGURADO
 import config
 import psutil  # ✅ Para verificar si el proceso aún está vivo
 from estado_pesajes import pesajes_temporales
+import json # Para leer archivo de estado
 
 # Ejecuta módulo 3
 def ejecutar_modulo3():

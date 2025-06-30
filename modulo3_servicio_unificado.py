@@ -16,14 +16,27 @@ import json
 import os
 
 #definio funcion para actualizar el estado del pesaje que se comparte con el modulo 1 y lo indico cada que agrego o elimino pesaje en pesajes_temporales
+# 🔄 Guardar estado actual de pesajes en archivo JSON
 def actualizar_estado_pesajes():
     ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
     try:
         with open(ruta, 'w') as f:
-            json.dump(list(pesajes_temporales.keys()), f)
+            json.dump(pesajes_temporales, f, indent=2)
     except Exception as e:
         print(f"❌ Error al guardar estado de pesajes: {e}")
 
+# 🔁 Cargar estado anterior desde archivo JSON (al iniciar)
+def cargar_estado_pesajes():
+    ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
+    try:
+        with open(ruta, 'r') as f:
+            datos = json.load(f)
+            pesajes_temporales.update(datos)
+    except Exception as e:
+        print(f"⚠️ No se pudo restaurar estado de pesajes: {e}")
+
+# 🟢 Llamar esta función cargar_estado_pesajes inmediatamente después de definirla
+cargar_estado_pesajes()
 
 # Función que se conecta al socket o modulo1 para obtener el peso actual y la hora desde modulo1
 def obtener_datos_peso():
