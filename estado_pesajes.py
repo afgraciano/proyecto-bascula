@@ -4,5 +4,6 @@ pesajes_temporales = {} # Guarda pesajes en curso por tipo:ID  clave: tipo:ID ->
 pesajes_confirmados = [] # Guarda pesajes finalizados con datos de cierre como tuplas (tipo, ID, peso_inicial, peso_final, fecha_ini, fecha_fin)
 
 
-
+# Estado global de impresión
+impresiones_abiertas = False
 

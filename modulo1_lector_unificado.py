@@ -186,7 +186,11 @@ def verificar_peso():
                                 return False
 
                 
-                        hay_pesaje_abierto = hay_pesajes_abiertos()
+                        def hay_impresion_Proceso():
+                            return os.path.exists('.proceso_impresion_activo')
+                        
+                        hay_pesaje_abierto = hay_pesajes_abiertos() or hay_impresion_Proceso()
+
 
                         if peso >= 300 or hay_pesaje_abierto:
                             if proceso_modulo3 is None or not proceso_activo(proceso_modulo3):

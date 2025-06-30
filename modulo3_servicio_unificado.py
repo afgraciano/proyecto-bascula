@@ -22,6 +22,12 @@ import os
 # Lista global para rastrear si hay ventanas de impresión abiertas
 ventanas_tiquete_abiertas = []
 
+# Función para cerrar el proceso activo de ingreso de datos
+def cerrar_proceso_impresion():
+    try:
+        os.remove(".proceso_impresion_activo")
+    except FileNotFoundError:
+        pass
 
 
 #defino funcion para imprimir tiquete
@@ -119,9 +125,12 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
         tk.Button(sub, text="🖨 Imprimir", command=imprimir_seleccionada).pack(pady=10)
     
     def cerrar_ventana():
-            if ventana in ventanas_tiquete_abiertas:
-                ventanas_tiquete_abiertas.remove(ventana)
-            ventana.destroy()
+        if ventana in ventanas_tiquete_abiertas:
+            ventanas_tiquete_abiertas.remove(ventana)
+        if not ventanas_tiquete_abiertas:
+            cerrar_proceso_impresion()  # ✅ se elimina .proceso_impresion_activo
+        ventana.destroy()
+
 
     # Botones principales
     tk.Button(frame_botones, text="🖨 Imprimir (predeterminada)", command=imprimir_default).pack(side="left", padx=5)
@@ -191,7 +200,10 @@ def modulo_servicio():
     
     # Función que se ejecuta al hacer clic en uno de los botones de servicio
     def verificar_servicio(tipo):
-        peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
+        # 🔒 Activar archivo que indica proceso de ingreso de datos
+        with open(".proceso_impresion_activo", "w") as f:
+            f.write("1")    
+            peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
 
         # Si el tipo de servicio es externo con subtipos
         if tipo == "Externo":
@@ -238,6 +250,7 @@ def modulo_servicio():
                 while True:
                     placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
                     if placa is None:
+                        cerrar_proceso_impresion()
                         return
                     placa = placa.strip().upper()
                     if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
@@ -268,16 +281,7 @@ def modulo_servicio():
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
                     peso_neto = abs(peso - peso_ini) #resta de los pesos y resultado simpre positivo
-                    # Mensaje tiquete y resultado en pantalla con impresion
-                    #messagebox.showinfo("Pesaje cerrado",
-                        #f"Cliente: {razon}\n"
-                        #f"NIT: {nit}\n"
-                        #f"Correo: {correo}\n"
-                        #f"ID: {id_final}\n"
-                        #f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
-                        #f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
-                        #f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
-                    
+                    # Mensaje tiquete y resultado en pantalla con impresion                                        
                     contenido = (
                         f"Cliente: {razon}\n"
                         f"NIT: {nit}\n"
@@ -292,6 +296,7 @@ def modulo_servicio():
                     pesajes_confirmados.append((tipo, id_final, peso_ini, peso, fecha_ini, fecha_actual))
                     del pesajes_temporales[clave]
                     actualizar_estado_pesajes()  # actualiza pesaje eliminado de pesajes abiertos
+                    #cerrar_proceso_impresion()
                     return  # Salimos porque ya hicimos el cierre
 
                 # 🔁 Si no hay pesaje previo, solicitamos los demás datos
@@ -356,9 +361,7 @@ def modulo_servicio():
                     # 🔁 Se registra como pesaje inicial
                     pesajes_temporales[clave] = (peso, fecha_actual, razon, nit, correo)
                     actualizar_estado_pesajes()  # 🔁 guardar el pesaje en el JSON
-                    # muestro en tiquete lo que esta en contenido con opcion de impresion del pesaje inicial 
-                    #messagebox.showinfo("Pesaje inicial",
-                        #f"Peso inicial registrado: {peso:.2f} kg\nID: {id_final}", parent=ventana)
+                    # muestro en tiquete lo que esta en contenido con opcion de impresion del pesaje inicial                     
                     contenido = (
                         f"Cliente: {razon}\n"
                         f"NIT: {nit}\n"
@@ -379,15 +382,7 @@ def modulo_servicio():
                         peso_final = int(peso_manual.strip())
                         fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Después de confirmarlo y escribir peso final Toma fecha al cierre
                         peso_neto = abs(peso_final - peso)
-                        # Mensaje tiquete y resultado en pantalla para imprimir
-                        #messagebox.showinfo("Pesaje manual",
-                            #f"Cliente: {razon}\n"
-                            #f"NIT: {nit}\n"
-                            #f"Correo: {correo}\n"
-                            #f"ID: {id_final}\n"
-                            #f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
-                            #f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
-                            #f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
+                        # Mensaje tiquete y resultado en pantalla para imprimir                        
                         contenido = (
                             f"Cliente: {razon}\n"
                             f"NIT: {nit}\n"
@@ -398,19 +393,12 @@ def modulo_servicio():
                             f"Peso Neto: {peso_neto:.2f} kg"
                         )
                         mostrar_tiquete_con_impresion("Pesaje manual", contenido)
-
+                        #cerrar_proceso_impresion()
                         pesajes_confirmados.append((tipo, id_final, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
                     else:
                         # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                         fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        #Solo muestra el peso actual si no se ingresó cierre manual para imprimir
-                        #messagebox.showinfo("Pesaje registrado",
-                            #f"Cliente: {razon}\n"
-                            #f"NIT: {nit}\n"
-                            #f"Correo: {correo}\n"
-                            #f"ID: {id_final}\n"
-                            #f"Peso actual: {peso:.2f} kg\n"
-                            #f"Fecha: {fecha_actual}", parent=ventana)
+                        #Solo muestra el peso actual si no se ingresó cierre manual para imprimir                        
                         contenido = (
                             f"Cliente: {razon}\n"
                             f"NIT: {nit}\n"
@@ -419,7 +407,8 @@ def modulo_servicio():
                             f"Peso actual: {peso:.2f} kg\n"
                             f"Fecha: {fecha_actual}"
                         )
-                        mostrar_tiquete_con_impresion("Pesaje registrado", contenido)                        
+                        mostrar_tiquete_con_impresion("Pesaje registrado", contenido)
+                        #cerrar_proceso_impresion()                        
                 return  # Fin del flujo 
               
 
@@ -428,6 +417,7 @@ def modulo_servicio():
             while True:
                 placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
                 if placa is None:
+                    cerrar_proceso_impresion()
                     return
                 placa = placa.strip().upper()
                 if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
@@ -466,14 +456,7 @@ def modulo_servicio():
                     peso_neto = abs(peso - peso_ini)#resta de los pesos y resultado simpre positivo
                     # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    # Se muestra resultado en pantalla con impresion
-                    #messagebox.showinfo("Resultado",
-                        #f"Cliente: {cliente.get()}\n"
-                        #f"Placa: {id_ingresado}\n"
-                        #f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
-                        #f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
-                        #f"Peso Neto: {peso_neto:.2f} kg\n"
-                        #f"Tipo de pago: {tipo_pago}", parent=ventana)
+                    # Se muestra resultado en pantalla con impresion                    
                     contenido = (
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
@@ -492,9 +475,7 @@ def modulo_servicio():
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     pesajes_temporales[clave] = (peso, fecha_actual)
                     actualizar_estado_pesajes()  # actualiza agregar pesajes abiertos
-                    # muestro en tiquete lo que esta en contenido con opcion de impresion del pesaje inicial
-                    #messagebox.showinfo("Pesaje inicial",
-                        #f"Peso inicial registrado: {peso:.2f} kg\nPlaca: {id_ingresado}", parent=ventana)
+                    # muestro en tiquete lo que esta en contenido con opcion de impresion del pesaje inicial                    
                     contenido = (
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
@@ -511,14 +492,7 @@ def modulo_servicio():
                     fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Toma fecha al confirmar el cierre
                     peso_final = int(peso_manual)
                     peso_neto = abs(peso_final - peso)
-                    # Mensaje tiquete y resultado en pantalla con impresion
-                    #messagebox.showinfo("Pesaje manual",
-                        #f"Cliente: {cliente.get()}\n"
-                        #f"Placa: {id_ingresado}\n"
-                        #f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
-                        #f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
-                        #f"Peso Neto: {peso_neto:.2f} kg\n"
-                        #f"Tipo de pago: {tipo_pago}", parent=ventana)                    
+                    # Mensaje tiquete y resultado en pantalla con impresion                                       
                     contenido = (
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
@@ -528,13 +502,11 @@ def modulo_servicio():
                         f"Tipo de pago: {tipo_pago}"
                     )
                     mostrar_tiquete_con_impresion("Pesaje manual", contenido)
-
+                    #cerrar_proceso_impresion()
                 else:
                     # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                     # Mensaje tiquete y resultado en pantalla con impresion sin ingreso peso final
-                    #messagebox.showinfo("Pesaje registrado",
-                        #f"Cliente: {cliente.get()}\nPlaca: {id_ingresado}\nPeso actual: {peso:.2f} kg\nFecha: {fecha_actual}\nTipo de pago: {tipo_pago}", parent=ventana)
                     contenido = (
                         f"Cliente: {cliente.get()}\n"
                         f"Placa: {id_ingresado}\n"
@@ -543,7 +515,7 @@ def modulo_servicio():
                         f"Tipo de pago: {tipo_pago}"
                     )
                     mostrar_tiquete_con_impresion("Pesaje registrado", contenido)
-
+                    #cerrar_proceso_impresion()
 
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
@@ -554,6 +526,7 @@ def modulo_servicio():
 
                 if placa is None:
                     # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
+                    cerrar_proceso_impresion()
                     return
 
                 if placa.strip() == "":
@@ -616,6 +589,7 @@ def modulo_servicio():
             while True:
                 remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
                 if remision is None:
+                    cerrar_proceso_impresion()
                     return
                 if remision.isdigit():
                     break
@@ -640,13 +614,7 @@ def modulo_servicio():
                 # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                 fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-                # Mensaje tiquete y resultado en pantalla con impresion
-                #messagebox.showinfo("Resultado",
-                    #f"Pesaje final registrado.\n"
-                    #f"{tipo}:\nID: {id_ingresado}\n"
-                    #f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
-                    #f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
-                    #f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)
+                # Mensaje tiquete y resultado en pantalla con impresion                
                 contenido = (
                     f"Pesaje final registrado.\n"
                     f"{tipo}:\n"
@@ -671,9 +639,7 @@ def modulo_servicio():
                 fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 pesajes_temporales[clave] = (peso, fecha_actual)  # Registra pesaje inicial
                 actualizar_estado_pesajes()  # actualizo inicio de pesajes abiertos
-                # mensaje inicio pesaje con impresion
-                #messagebox.showinfo("Pesaje inicial",
-                    #f"Peso inicial registrado: {peso:.2f} kg\nID: {id_ingresado}", parent=ventana)
+                # mensaje inicio pesaje con impresion                
                 contenido = (
                     f"Peso inicial registrado: {peso:.2f} kg\n"
                     f"{tipo}:\n"
@@ -691,12 +657,7 @@ def modulo_servicio():
                     peso_final = int(peso_manual.strip())  # Convierte a entero
                     fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha final
                     peso_neto = abs(peso_final - peso)  # Calcula neto
-                    # Mensaje tiquete y resultado en pantalla con impresion
-                    #messagebox.showinfo("Pesaje manual",
-                        #f"{tipo}:\nID: {id_ingresado}\n"
-                        #f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
-                        #f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
-                        #f"Peso Neto: {peso_neto:.2f} kg", parent=ventana)                    
+                    # Mensaje tiquete y resultado en pantalla con impresion                                        
                     contenido = (
                         f"{tipo}:\n"
                         f"ID: {id_ingresado}\n"
@@ -705,14 +666,12 @@ def modulo_servicio():
                         f"Peso Neto: {peso_neto:.2f} kg"
                     )
                     mostrar_tiquete_con_impresion("Pesaje manual", contenido)
-
+                    #cerrar_proceso_impresion()
                     pesajes_confirmados.append((tipo, id_ingresado, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
                 else:
                     # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
                     fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    # Si no se ingresó peso final manual, solo muestra registro actual con impresion
-                    #messagebox.showinfo("Pesaje registrado",
-                        #f"{tipo}:\nID: {id_ingresado}\nPeso actual: {peso:.2f} kg\nFecha: {fecha_actual}", parent=ventana)
+                    # Si no se ingresó peso final manual, solo muestra registro actual con impresion                    
                     contenido = (
                         f"{tipo}:\n"
                         f"ID: {id_ingresado}\n"
@@ -720,7 +679,7 @@ def modulo_servicio():
                         f"Fecha: {fecha_actual}"
                     )
                     mostrar_tiquete_con_impresion("Pesaje Registrado", contenido)
-
+                    #cerrar_proceso_impresion()
 
 
         # Solicita los mismos datos que Inmuniza/Aserrio, pero solo imprime peso actual para Astillable
@@ -730,6 +689,7 @@ def modulo_servicio():
                 placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
                 if placa is None:
                     # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
+                    cerrar_proceso_impresion()
                     return
                 if placa.strip() == "":
                     # El usuario presionó "Aceptar" sin escribir → mostrar advertencia
@@ -786,6 +746,7 @@ def modulo_servicio():
             while True:
                 remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
                 if remision is None:
+                    cerrar_proceso_impresion()
                     return
                 if remision.isdigit():
                     break
@@ -798,11 +759,7 @@ def modulo_servicio():
             # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
             fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             
-            # Mensaje resultado final impreso en pantalla de astillable con impresion
-            #messagebox.showinfo("Resultado",
-                #f"Pesaje final registrado.\n"
-                #f"{tipo}:\n ID: {id_ingresado}\n"
-                #f"Peso: {peso:.2f} kg\nFecha: {fecha_actual}", parent=ventana)
+            # Mensaje resultado final impreso en pantalla de astillable con impresion            
             contenido = (
                 f"Pesaje final registrado.\n"
                 f"{tipo}:\nID: {id_ingresado}\n"
