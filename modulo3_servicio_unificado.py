@@ -199,11 +199,12 @@ def confirmar_o_pedir_peso(peso, ventana):
 def modulo_servicio():
     
     # Función que se ejecuta al hacer clic en uno de los botones de servicio
-    def verificar_servicio(tipo):
-        # 🔒 Activar archivo que indica proceso de ingreso de datos
-        with open(".proceso_impresion_activo", "w") as f:
-            f.write("1")    
-            peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
+    def verificar_servicio(tipo, cliente_seleccionado=None):
+        frame_subclientes.pack_forget()  # 🔁 Siempre cerrar sub-botones al iniciar el flujo
+        
+        
+          
+        peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
 
         # Si el tipo de servicio es externo con subtipos
         if tipo == "Externo":
@@ -218,29 +219,35 @@ def modulo_servicio():
             cliente = tk.StringVar(value="")
 
             # Selección del cliente externo
-            subventana = tk.Toplevel(ventana)
-            subventana.title("Seleccione Cliente Externo")
-            subventana.geometry("300x200")
-            subventana.attributes("-topmost", True)
-            subventana.resizable(False, False)
-            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
-            subventana.overrideredirect(True)
+            #subventana = tk.Toplevel(ventana)
+            #subventana.title("Seleccione Cliente Externo")
+            #subventana.geometry("300x200")
+            #subventana.attributes("-topmost", True)
+            #subventana.resizable(False, False)
+            #subventana.protocol("WM_DELETE_WINDOW", lambda: None)
+            #subventana.overrideredirect(True)
 
-            marco = tk.Frame(subventana, bd=2, relief="ridge")
-            marco.pack(expand=True, fill="both", padx=5, pady=5)
+            #marco = tk.Frame(subventana, bd=2, relief="ridge")
+            #marco.pack(expand=True, fill="both", padx=5, pady=5)
 
-            tk.Label(marco, text="Seleccione el cliente externo:", font=("Arial", 11)).pack(pady=10)
+            #tk.Label(marco, text="Seleccione el cliente externo:", font=("Arial", 11)).pack(pady=10)
 
-            def seleccionar_cliente(nombre):
-                cliente.set(nombre)
-                subventana.destroy()
+            #def seleccionar_cliente(nombre):
+                #cliente.set(nombre)
+                #subventana.destroy()
 
-            for nombre in subtipos:
-                tk.Button(marco, text=nombre, width=30, command=lambda n=nombre: seleccionar_cliente(n)).pack(pady=3)
+            #for nombre in subtipos:
+                #tk.Button(marco, text=nombre, width=30, command=lambda n=nombre: seleccionar_cliente(n)).pack(pady=3)
 
-            ventana.wait_window(subventana)
-            if not cliente.get():
-                return
+            #ventana.wait_window(subventana)
+            #if not cliente.get():
+                #return
+                
+            # Asigna el cliente seleccionado u obteniendo desde el botón del submenu
+            if cliente_seleccionado:
+                cliente.set(cliente_seleccionado)
+            else:
+                return  # Seguridad: Si no se pasa cliente externo, se cancela el proceso y salimos
             
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
             # comportamiento para Tercero (pago inmediato)
@@ -808,14 +815,65 @@ def modulo_servicio():
 
     # Sección con los botones para elegir el tipo de servicio
     tk.Label(ventana, text="Seleccione el tipo de servicio:", font=("Arial", 12)).pack(pady=10)
-
-    frame_botones = tk.Frame(ventana)  # Contenedor horizontal de botones
+    
+    frame_botones = tk.Frame(ventana)
     frame_botones.pack(pady=5)
+
+    # 🔻 Frame donde aparecerán sub-botones de clientes externos
+    frame_subclientes = tk.Frame(ventana)
+    frame_subclientes.pack(pady=5)
+    frame_subclientes.pack_forget()  # Oculto por defecto
+
+    # Subclientes de Externo
+    clientes_externos = {
+        "Tercero (pago inmediato)": "Pago inmediato",
+        "Cipreses de Colombia": "Pago mensual",
+        "Núcleos de Madera": "Pago mensual",
+        "Construinmuniza": "Pago mensual"
+    }
+
+    # Función llamada al seleccionar cliente
+    def seleccionar_cliente_externo(nombre_cliente):
+        frame_subclientes.pack_forget()  # Oculta los sub-botones al seleccionar
+        verificar_servicio("Externo", cliente_seleccionado=nombre_cliente)
+
+    # Función llamada al presionar botón principal
+    def manejar_servicio(tipo):
+        
+        # 🔒 Activar archivo que indica proceso de ingreso de datos(creo archivo puntero)
+        with open(".proceso_impresion_activo", "w") as f:
+            f.write("1")  
+        
+        if tipo == "Externo":
+            for widget in frame_subclientes.winfo_children():
+                widget.destroy()
+
+            tk.Label(frame_subclientes, text="Seleccione el cliente externo:",
+                    font=("Arial", 10)).pack(pady=(0, 5))
+
+            for nombre_cliente in clientes_externos:
+                tk.Button(frame_subclientes, text=nombre_cliente,
+                        width=30, font=("Arial", 9),
+                        command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
+                        ).pack(pady=2)
+
+            frame_subclientes.pack()
+        else:
+            frame_subclientes.pack_forget()
+            verificar_servicio(tipo)
 
     tipos = ["Externo", "Inmuniza", "Aserrio", "Astillable"]
     for tipo in tipos:
-        tk.Button(frame_botones, text=tipo, width=15, font=("Arial", 11),
-                  command=lambda t=tipo: verificar_servicio(t)).pack(side="left", padx=5)
+        tk.Button(frame_botones, text=tipo, width=10, font=("Arial", 9),
+                command=lambda t=tipo: manejar_servicio(t)).pack(side="left", padx=5)
+ 
+    #frame_botones = tk.Frame(ventana)  # Contenedor horizontal de botones
+    #frame_botones.pack(pady=5)
+
+    #tipos = ["Externo", "Inmuniza", "Aserrio", "Astillable"]
+    #for tipo in tipos:
+        #tk.Button(frame_botones, text=tipo, width=15, font=("Arial", 11),
+                  #command=lambda t=tipo: verificar_servicio(t)).pack(side="left", padx=5)
 
     ventana.mainloop()  # Inicia el bucle principal de la ventana (la mantiene abierta)
 
