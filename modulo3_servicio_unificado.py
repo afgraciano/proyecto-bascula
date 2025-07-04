@@ -1,5 +1,6 @@
 # Importación de módulos necesarios
 import tkinter as tk  # Módulo principal para la GUI Para interfaces gráficas
+from tkinter import ttk  # Módulo para widgets avanzados (Treeview, Combobox, etc.)
 from tkinter import simpledialog, messagebox  # Para cuadros de diálogo simples y mensajes emergentes
 import socket  # Para la comunicación con el módulo que lee el peso (modulo1) Comunicación por red local (localhost)
 import json  # Para interpretar los datos recibidos en formato JSON
@@ -16,18 +17,11 @@ import win32ui
 # para permitir el acceso y actualización compartida entre módulos (como módulo1 y módulo3)
 from estado_pesajes import pesajes_temporales, pesajes_confirmados
 import json
-import os
+import os #realizar operaciones sobre sistema operativo (comprueba archivo existe, elimina archivos, crea carpetas, accede path del sistema, etc.)
 
 
 # Lista global para rastrear si hay ventanas de impresión abiertas
 ventanas_tiquete_abiertas = []
-
-# Función para cerrar el proceso activo de ingreso de datos
-def cerrar_proceso_impresion():
-    try:
-        os.remove(".proceso_impresion_activo")
-    except FileNotFoundError:
-        pass
 
 
 #defino funcion para imprimir tiquete
@@ -152,6 +146,7 @@ def actualizar_estado_pesajes():
     except Exception as e:
         print(f"❌ Error al guardar estado de pesajes: {e}")
 
+
 # 🔁 Cargar estado anterior desde archivo JSON (al iniciar)
 def cargar_estado_pesajes():
     ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
@@ -161,6 +156,7 @@ def cargar_estado_pesajes():
             pesajes_temporales.update(datos)
     except Exception as e:
         print(f"⚠️ No se pudo restaurar estado de pesajes: {e}")
+
 
 # 🟢 Llamar esta función cargar_estado_pesajes inmediatamente después de definirla
 cargar_estado_pesajes()
@@ -175,6 +171,7 @@ def obtener_datos_peso():
             return resultado.get("peso", 0), resultado.get("timestamp", "")
     except:
         return 0, "" 
+   
     
 # Función para confirmar o permitir ingreso manual si el peso es bajo
 def confirmar_o_pedir_peso(peso, ventana):
@@ -194,6 +191,21 @@ def confirmar_o_pedir_peso(peso, ventana):
                 return None
     return peso
  # Si falla la conexión o algo sale mal, retorna 0 y cadena vacía
+ 
+ 
+ 
+ # Funcion que Devuelve True si el archivo puntero existe
+def proceso_impresion_activo():
+    return os.path.exists(".proceso_impresion_activo")
+
+
+# Función para cerrar el proceso activo de ingreso de datos
+def cerrar_proceso_impresion():
+    try:
+        os.remove(".proceso_impresion_activo") # Elimina el archivo puntero cuando se cierra el proceso
+    except FileNotFoundError:
+        pass
+    frame_subclientes.pack_forget()  # Oculta el submenú si está visible
 
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3
 def modulo_servicio():
@@ -746,6 +758,7 @@ def modulo_servicio():
 
             # Cancelar si no se seleccionó nada
             if not empresa.get():
+                cerrar_proceso_impresion()
                 return
 
             
@@ -816,13 +829,115 @@ def modulo_servicio():
     # Sección con los botones para elegir el tipo de servicio
     tk.Label(ventana, text="Seleccione el tipo de servicio:", font=("Arial", 12)).pack(pady=10)
     
-    frame_botones = tk.Frame(ventana)
-    frame_botones.pack(pady=5)
+    # Contenedor superior para agrupar botones principales y subclientes
+    frame_superior = tk.Frame(ventana)
+    frame_superior.pack(pady=5)
+
+    frame_botones = tk.Frame(frame_superior)
+    frame_botones.pack()
 
     # 🔻 Frame donde aparecerán sub-botones de clientes externos
-    frame_subclientes = tk.Frame(ventana)
-    frame_subclientes.pack(pady=5)
-    frame_subclientes.pack_forget()  # Oculto por defecto
+    global frame_subclientes # declaro la variable como global para que sea visible fuera del metodo 
+    frame_subclientes = tk.Frame(frame_superior)
+    
+    frame_subclientes.pack()
+    frame_subclientes.pack_forget()  # Oculta botones por defecto
+
+    
+    # 🔳 Frame donde se insertarán formularios dinámicos (placa, remisión, RG/MS, etc.)
+    frame_formulario = tk.Frame(ventana)
+    frame_formulario.pack(pady=10, fill="x")
+
+    # 🧾 Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha)
+    tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
+
+    tree = ttk.Treeview(ventana, columns=("clave", "peso", "fecha"), show="headings", height=8)
+    tree.heading("clave", text="Clave")
+    tree.heading("peso", text="Peso Inicial")
+    tree.heading("fecha", text="Fecha")
+    tree.column("clave", width=300)
+    tree.column("peso", anchor="center")
+    tree.column("fecha", anchor="center")
+    tree.pack(expand=True, fill="both", padx=10, pady=5)
+
+    # 🔁 Función para cargar y refrescar la tabla desde el JSON en tiempo real
+    def refrescar_tabla_pesajes():
+        selected = tree.selection()
+        selected_claves = [tree.item(item, "values")[0] for item in selected]
+
+        tree.delete(*tree.get_children())# limpia tabla
+        for clave, valor in pesajes_temporales.items():
+            if isinstance(valor, (list, tuple)) and len(valor) >= 2:
+                peso_ini = valor[0]
+                fecha = valor[1]
+                tree.insert("", "end", values=(clave, f"{peso_ini:.2f}", fecha))
+
+        # Restaurar la selección si todavía existe esa clave
+        for item in tree.get_children():
+            clave = tree.item(item, "values")[0]
+            if clave in selected_claves:
+                tree.selection_add(item)
+                break  # Solo seleccionamos uno
+
+    
+    # Ejecutar refresco periódico cada 500ms
+    def refresco_automatico_tabla():
+        refrescar_tabla_pesajes()
+        ventana.after(500, refresco_automatico_tabla)            
+    
+    #ventana.after(500, refrescar_tabla_pesajes)  # Se refresca automáticamente
+    refresco_automatico_tabla()
+    
+    # 🔘 Botones debajo de la tabla
+    frame_botones_tabla = tk.Frame(ventana)
+    frame_botones_tabla.pack(pady=(0, 10))
+
+    # Botón imprimir
+    def imprimir_seleccionado():
+        selected_items = tree.selection()
+        if not selected_items:
+            messagebox.showwarning("Sin selección", "Seleccione un pesaje para imprimir.")
+            return
+        clave = tree.item(selected_items[0], "values")[0]
+
+        if clave in pesajes_temporales:
+            datos = pesajes_temporales[clave]
+            if len(datos) == 5:  # Externos - Tercero
+                peso, fecha, razon, nit, correo = datos
+                contenido = (
+                    f"Cliente: {razon}\n"
+                    f"NIT: {nit}\n"
+                    f"Correo: {correo}\n"
+                    f"ID: {clave}\n"
+                    f"Peso inicial registrado: {peso:.2f} kg\n"
+                    f"Fecha: {fecha}"
+                )
+            elif len(datos) == 2:  # Otros
+                peso, fecha = datos
+                contenido = (
+                    f"ID: {clave}\n"
+                    f"Peso inicial registrado: {peso:.2f} kg\n"
+                    f"Fecha: {fecha}"
+                )
+            else:
+                contenido = f"Registro: {clave}"
+            mostrar_tiquete_con_impresion("Resumen pesaje", contenido)
+
+    # Botón editar
+    def editar_datos_pesaje():
+        selected_items = tree.selection()
+        if not selected_items:
+            messagebox.showwarning("Sin selección", "Seleccione un pesaje para imprimir.")
+            return
+        clave = tree.item(selected_items[0], "values")[0]
+
+        messagebox.showinfo("Editar", f"Aún no implementado: edición de datos para {clave}")
+
+    tk.Button(frame_botones_tabla, text="🖨 Imprimir", command=imprimir_seleccionado).pack(side="left", padx=10)
+    tk.Button(frame_botones_tabla, text="✏️ Editar", command=editar_datos_pesaje).pack(side="left", padx=10)
+
+
+
 
     # Subclientes de Externo
     clientes_externos = {
@@ -837,31 +952,66 @@ def modulo_servicio():
         frame_subclientes.pack_forget()  # Oculta los sub-botones al seleccionar
         verificar_servicio("Externo", cliente_seleccionado=nombre_cliente)
 
+    #declaro variable booleanda para controlar estado de visibilidad de botones clientes
+    mostrar_clientes = tk.BooleanVar(value=False)  # Estado inicial: oculto
+
+    
     # Función llamada al presionar botón principal
     def manejar_servicio(tipo):
+        #verifico si funcion de proceso de impresion esta activa (si archivo puntero esta creado) para bloquear los botones principales
+        if proceso_impresion_activo():
+            messagebox.showinfo("Proceso activo", "Ya hay un proceso en curso. Finalícelo antes de iniciar otro.")
+            return
         
-        # 🔒 Activar archivo que indica proceso de ingreso de datos(creo archivo puntero)
-        with open(".proceso_impresion_activo", "w") as f:
-            f.write("1")  
-        
+       
+
         if tipo == "Externo":
-            for widget in frame_subclientes.winfo_children():
-                widget.destroy()
+            
+            if mostrar_clientes.get():
+                # 🔁 Toggle: si ya está visible, lo ocultamos
+                # Si ya está desplegado y no hay proceso activo, lo cerramos
+                if not proceso_impresion_activo():
+                    frame_subclientes.pack_forget()#oculta botones
+                    mostrar_clientes.set(False)
+                else:
+                    messagebox.showinfo("Proceso activo", "Debe finalizar el proceso de ingreso antes de cerrar este menú.")
+                return
+ 
+            #if mostrar_clientes.get():
+                #frame_subclientes.pack_forget()#oculta botones
+                #mostrar_clientes.set(False)
+                #cerrar_proceso_impresion() #quita el archivo puntero para finalizar proceso de impresion
+            else:
+                 # 🔒 Activar archivo que indica proceso de ingreso de datos(creo archivo puntero)
+                with open(".proceso_impresion_activo", "w") as f:
+                    f.write("1")
+                
+                # Mostrar botones de cliente
+                for widget in frame_subclientes.winfo_children():
+                    widget.destroy()
 
-            tk.Label(frame_subclientes, text="Seleccione el cliente externo:",
-                    font=("Arial", 10)).pack(pady=(0, 5))
+                tk.Label(frame_subclientes, text="Seleccione el cliente externo:",
+                        font=("Arial", 10)).pack(pady=(0, 5))
 
-            for nombre_cliente in clientes_externos:
-                tk.Button(frame_subclientes, text=nombre_cliente,
-                        width=30, font=("Arial", 9),
-                        command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
-                        ).pack(pady=2)
+                for nombre_cliente in clientes_externos:
+                    tk.Button(frame_subclientes, text=nombre_cliente,
+                            width=30, font=("Arial", 9),
+                            command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
+                            ).pack(pady=2)
 
-            frame_subclientes.pack()
+                frame_subclientes.pack()
+                mostrar_clientes.set(True)
+
         else:
-            frame_subclientes.pack_forget()
+            # 🔒 Activar proceso para los otros botones principales
+            with open(".proceso_impresion_activo", "w") as f:
+                f.write("1")
+            
+            # Otro tipo de servicio → ocultar subclientes si estaban abiertos
+            frame_subclientes.pack_forget()#oculta botones
+            mostrar_clientes.set(False)
             verificar_servicio(tipo)
-
+    
     tipos = ["Externo", "Inmuniza", "Aserrio", "Astillable"]
     for tipo in tipos:
         tk.Button(frame_botones, text=tipo, width=10, font=("Arial", 9),
