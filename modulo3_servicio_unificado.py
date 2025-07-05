@@ -135,17 +135,29 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
 
 
 
-
 #definio funcion para actualizar el estado del pesaje que se comparte con el modulo 1 y lo indico cada que agrego o elimino pesaje en pesajes_temporales
 # 🔄 Guardar estado actual de pesajes en archivo JSON
+# 🔁 Carga todos los pesajes abiertos desde el JSON y los lleva a pesajes_temporales
 def actualizar_estado_pesajes():
-    ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
-    try:
-        with open(ruta, 'w') as f:
-            json.dump(pesajes_temporales, f, indent=2)
-    except Exception as e:
-        print(f"❌ Error al guardar estado de pesajes: {e}")
+    global pesajes_temporales
+    pesajes_temporales = {}
 
+    try:
+        with open("estado_actual_pesajes.json", "r") as file:
+            estado = json.load(file)
+    except FileNotFoundError:
+        return
+
+    for clave, valor in estado.items():
+        if isinstance(valor, list) and len(valor) == 5:
+            # Externos - Tercero
+            pesajes_temporales[clave] = tuple(valor)
+        elif isinstance(valor, dict):
+            if "peso_entrada" in valor and "fecha_hora_entrada" in valor:
+                peso = valor["peso_entrada"]
+                fecha = valor["fecha_hora_entrada"]
+                pesajes_temporales[clave] = (peso, fecha)
+                
 
 # 🔁 Cargar estado anterior desde archivo JSON (al iniciar)
 def cargar_estado_pesajes():
@@ -221,7 +233,9 @@ def cerrar_proceso_impresion():
 
 
 # 🔁 Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrio, Astillable
-def mostrar_formulario_interno(tipo, ventana, frame_formulario):
+
+def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente):
+    
     # 🔁 Asegura que el frame esté visible incluso si fue ocultado con .pack_forget()
     frame_formulario.pack(pady=10, fill="x")
        
@@ -236,16 +250,15 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario):
     fila_formulario = tk.Frame(frame_formulario)
     fila_formulario.pack(fill="x", pady=5)
     
-    # Entrada: Placa Paso 1:Solicita placa del vehículo (formato ABC123)
+    # Placa del vehículo (formato ABC123)
     tk.Label(fila_formulario, text="Placa del vehículo (Ej: ABC123):", anchor="center").grid(row=0, column=0, padx=10)
     entry_placa = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
     entry_placa.grid(row=1, column=0, padx=10)
 
 
-    # Entrada: Empresa (RG o MS)
+    #  Empresa (RG o MS) 
     tk.Label(fila_formulario, text="Seleccione la empresa:", anchor="center").grid(row=0, column=1, padx=10)
-    # Inicializamos la variable con un valor inválido
-    empresa = tk.StringVar(value="__nulo__")  # ← valor que no coincide con ninguna opción sin seleccion inicial
+    empresa = tk.StringVar(value="__nulo__")  # ← valor que no coincide con ninguna opción sin seleccion inicial osea inicializamos variable con valor invalido
     frame_empresa = tk.Frame(fila_formulario)
     frame_empresa.grid(row=1, column=1, padx=10)
     tk.Radiobutton(frame_empresa, text="RG", variable=empresa, value="RG").pack(side="left", padx=5)
@@ -253,17 +266,17 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario):
 
 
  
-    # Entrada: Remisión solo numero
+    # Remisión solo numero
     tk.Label(fila_formulario, text="Número de remisión (solo números):", anchor="center").grid(row=0, column=2, padx=10)
     entry_remision = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
     entry_remision.grid(row=1, column=2, padx=10)
+    # Presionar Enter en remisión activa confirmación
+    entry_remision.bind("<Return>", lambda event: confirmar_datos())
 
 
     # 🔘 Función crea boton para confirmar los datos y continuar el flujo de pesaje
     def confirmar_datos():
-        placa = entry_placa.get().strip().upper() # 🔁 Convierte a mayúsculas automáticamente con upper
-        
-        
+        placa = entry_placa.get().strip().upper() # 🔁 Convierte a mayúsculas automáticamente con upper      
         remision = entry_remision.get().strip()
         empresa_sel = empresa.get()
 
@@ -297,16 +310,24 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario):
         peso, _ = obtener_datos_peso()
 
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
-        continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana)
+        # Llama a función unificada que maneja apertura o cierre manual
+        continuar_flujo_pesaje_interno(
+            tipo=tipo,
+            clave=clave,
+            id_ingresado=id_ingresado,
+            peso=peso,
+            ventana=ventana,
+            refrescar_tabla_pesajes=refrescar_tabla_pesajes,
+            limpiar_formulario_unicamente=limpiar_formulario_unicamente
+        )
+        
      
      # 🔴 Función para boton cancelar del formulario
-    def cancelar():
-        # 🔁 Limpia todo el contenido del frame sin eliminar el contenedor
-        for widget in frame_formulario.winfo_children():
-            widget.destroy()
 
-        # 🔒 Finaliza proceso de impresión
+    def cancelar():
+        limpiar_formulario_unicamente()
         cerrar_proceso_impresion()
+
 
 
     # Botones de acción
@@ -321,11 +342,11 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario):
 # 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.
-def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana):
-    
+def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+  
     # Cargar archivo de estado
-    archivo_estado = "estado_pesajes.json"
-    
+    archivo_estado = "estado_actual_pesajes.json"
+
     try:
         with open(archivo_estado, "r") as file:
             estado = json.load(file)
@@ -333,45 +354,92 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana):
         estado = {}
 
     # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
-    if clave in estado:
-        mostrar_tiquete_con_impresion(estado[clave], clave, tipo, peso, ventana)
-        cerrar_proceso_impresion()
+      
+    # 📌 Si el pesaje ya fue iniciado → es un cierre manual
+    if clave in estado and tipo in ["Inmuniza", "Aserrio"]:
+        def cerrar_con_peso(peso_final):
+            fecha_inicial = estado[clave]["fecha_hora_entrada"]
+            peso_inicial = estado[clave]["peso_entrada"]
+            peso_neto = abs(peso_final - peso_inicial)
+            fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            # Actualizar y eliminar el pesaje
+            estado[clave]["peso_salida"] = peso_final
+            estado[clave]["fecha_hora_salida"] = fecha_actual
+            del estado[clave]# ✅ Elimina el pesaje cerrado
+            
+            with open(archivo_estado, "w") as file:
+                json.dump(estado, file, indent=4)
+
+            contenido = (
+                f"Pesaje final registrado.\n"
+                f"{tipo}:\n"
+                f"ID: {id_ingresado}\n"
+                f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
+                f"Peso Final: {peso_final:.2f} kg — {fecha_actual}\n"
+                f"Peso Neto: {peso_neto:.2f} kg"
+            )
+            mostrar_tiquete_con_impresion("Resultado", contenido)
+            
+            #cerrar_proceso_impresion()
+            actualizar_estado_pesajes() # ✅ actualiza JSON en memoria
+            
+            if refrescar_tabla_pesajes:
+                refrescar_tabla_pesajes() # ✅ actualiza tabla en pantalla
+                
+            if limpiar_formulario_unicamente:
+                limpiar_formulario_unicamente()
+
+        # Preguntar si desea usar el peso actual o ingresar manual para cerrar
+        # ✅ Aquí usamos confirmar_o_pedir_peso
+        peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+        if peso_confirmado is None:
+            return
+
+        cerrar_con_peso(peso_confirmado)
         return
 
-    # Si no existe, crear nuevo registro
-    
-    # Si es Inmuniza o Aserrio, guardar nuevo pesaje abierto
+    # 🟢 NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
     if tipo in ["Inmuniza", "Aserrio"]:
+        fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         estado[clave] = {
             "tipo": tipo,
             "id": id_ingresado,
             "peso_entrada": peso,
-            "fecha_hora_entrada": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            "fecha_hora_entrada": fecha_entrada
         }
 
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
 
-        mostrar_tiquete_con_impresion(estado[clave], clave, tipo, peso, ventana)
+        contenido = (
+            f"Pesaje inicial registrado.\n"
+            f"{tipo}:\n"
+            f"ID: {id_ingresado}\n"
+            f"Peso Inicial: {peso:.2f} kg — {fecha_entrada}"
+        )
+        mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
+        
+        actualizar_estado_pesajes()
+        if refrescar_tabla_pesajes:
+            refrescar_tabla_pesajes()
 
-    else:
-        # si es Astillable: solo imprimir
-        registro_temporal = {
-            "tipo": tipo,
-            "id": id_ingresado,
-            "peso_entrada": peso,
-            "fecha_hora_entrada": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+    # 🟣 ASTILLABLE (solo imprime, no guarda)
+    elif tipo == "Astillable":
+        fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        contenido = (
+            f"Pesaje único registrado.\n"
+            f"{tipo}:\n"
+            f"ID: {id_ingresado}\n"
+            f"Peso: {peso:.2f} kg — {fecha_actual}"
+        )
+        mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
-        mostrar_tiquete_con_impresion(registro_temporal, clave, tipo, peso, ventana)
+    #cerrar_proceso_impresion()
 
-    cerrar_proceso_impresion()
+    # ✅ Limpieza visual del formulario después de completar (usando función dedicada)
+    if limpiar_formulario_unicamente:
+        limpiar_formulario_unicamente()
 
-    # ✅ Limpia el formulario visual después de completar
-    for widget in ventana.winfo_children():
-        if isinstance(widget, tk.Frame) and widget != ventana.nametowidget('.!frame'):  # evita tocar los botones
-            for subwidget in widget.winfo_children():
-                subwidget.destroy()
 
 
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3, crea la interfaz del módulo
@@ -402,30 +470,6 @@ def modulo_servicio():
 
             cliente = tk.StringVar(value="")
 
-            # Selección del cliente externo
-            #subventana = tk.Toplevel(ventana)
-            #subventana.title("Seleccione Cliente Externo")
-            #subventana.geometry("300x200")
-            #subventana.attributes("-topmost", True)
-            #subventana.resizable(False, False)
-            #subventana.protocol("WM_DELETE_WINDOW", lambda: None)
-            #subventana.overrideredirect(True)
-
-            #marco = tk.Frame(subventana, bd=2, relief="ridge")
-            #marco.pack(expand=True, fill="both", padx=5, pady=5)
-
-            #tk.Label(marco, text="Seleccione el cliente externo:", font=("Arial", 11)).pack(pady=10)
-
-            #def seleccionar_cliente(nombre):
-                #cliente.set(nombre)
-                #subventana.destroy()
-
-            #for nombre in subtipos:
-                #tk.Button(marco, text=nombre, width=30, command=lambda n=nombre: seleccionar_cliente(n)).pack(pady=3)
-
-            #ventana.wait_window(subventana)
-            #if not cliente.get():
-                #return
                 
             # Asigna el cliente seleccionado u obteniendo desde el botón del submenu
             if cliente_seleccionado:
@@ -486,8 +530,9 @@ def modulo_servicio():
 
                     pesajes_confirmados.append((tipo, id_final, peso_ini, peso, fecha_ini, fecha_actual))
                     del pesajes_temporales[clave]
-                    actualizar_estado_pesajes()  # actualiza pesaje eliminado de pesajes abiertos
-                    #cerrar_proceso_impresion()
+                    actualizar_estado_pesajes()  # actualiza pesaje eliminado de pesajes abiertos, actualiza JSON en memoria
+                    if refrescar_tabla_pesajes:
+                        refrescar_tabla_pesajes()  # ✅ actualiza tabla en pantalla
                     return  # Salimos porque ya hicimos el cierre
 
                 # 🔁 Si no hay pesaje previo, solicitamos los demás datos
@@ -552,6 +597,8 @@ def modulo_servicio():
                     # 🔁 Se registra como pesaje inicial
                     pesajes_temporales[clave] = (peso, fecha_actual, razon, nit, correo)
                     actualizar_estado_pesajes()  # 🔁 guardar el pesaje en el JSON
+                    if refrescar_tabla_pesajes:
+                        refrescar_tabla_pesajes()  # ✅ actualiza tabla en pantalla
                     # muestro en tiquete lo que esta en contenido con opcion de impresion del pesaje inicial                     
                     contenido = (
                         f"Cliente: {razon}\n"
@@ -711,262 +758,10 @@ def modulo_servicio():
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
         elif tipo in ["Inmuniza", "Aserrio", "Astillable"]:
-            mostrar_formulario_interno(tipo, ventana, frame_formulario)
+            mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente)
             return
 
         
-        """
-        #elif tipo in ["Inmuniza", "Aserrio"]:
-            # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
-            while True:
-                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
-
-                if placa is None:
-                    # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
-                    cerrar_proceso_impresion()
-                    return
-
-                if placa.strip() == "":
-                    # El usuario presionó "Aceptar" sin escribir → mostrar advertencia
-                    messagebox.showwarning("Campo obligatorio", "Debe ingresar una placa para continuar.", parent=ventana)
-                    continue
-
-                placa = placa.upper()
-                if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
-                    break  # ✅ Formato válido
-                else:
-                    # ❌ Formato incorrecto: mostrar error
-                    messagebox.showerror(
-                        "Formato inválido",
-                        "La placa debe tener 3 letras seguidas de 3 números.\n"
-                        "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n\nEjemplo válido: LLL111",
-                        parent=ventana
-                    )
-
-
-            # Paso 2: Seleccionar RG o MS como empresa
-            empresa = tk.StringVar(value="")  # No hay valor por defecto aún
-
-            subventana = tk.Toplevel(ventana)
-            subventana.title("Seleccione Empresa")
-            subventana.geometry("250x130")
-            subventana.attributes("-topmost", True)
-            subventana.resizable(False, False)
-            subventana.focus_force()
-
-            # Eliminar botones del sistema (cierra y minimiza)
-            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
-            subventana.overrideredirect(True)  # ❌ Oculta bordes y botones (incluyendo minimizar)
-
-            # Fondo con borde simulado (opcional si se usa overrideredirect)
-            marco = tk.Frame(subventana, bd=2, relief="ridge")
-            marco.pack(expand=True, fill="both", padx=5, pady=5)
-
-            tk.Label(marco, text="Seleccione la empresa:", font=("Arial", 11)).pack(pady=10)
-
-            # Función para selección
-            def seleccionar_empresa(valor):
-                empresa.set(valor)
-                subventana.destroy()
-
-            # Botones
-            tk.Button(marco, text="RG", width=10, command=lambda: seleccionar_empresa("RG")).pack(pady=5)
-            tk.Button(marco, text="MS", width=10, command=lambda: seleccionar_empresa("MS")).pack(pady=5)
-
-            # Espera hasta selección
-            ventana.wait_window(subventana)
-
-            # Cancelar si no se seleccionó nada
-            if not empresa.get():
-                return
-
-
-
-            # Paso 3: Ingresar número de remisión (solo dígitos)
-            while True:
-                remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
-                if remision is None:
-                    cerrar_proceso_impresion()
-                    return
-                if remision.isdigit():
-                    break
-                else:
-                    messagebox.showerror("Inválido", "La remisión debe contener solo números.", parent=ventana)
-
-            # Construir el ID final
-            id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
-            clave = f"{tipo}:{id_ingresado}"
-            
-            
-            # Verificamos Si ya hay un pesaje abierto con esta clave, cerrar directamente sin volver a preguntar
-            if clave in pesajes_temporales:
-                peso_inicial, fecha_inicial = pesajes_temporales[clave]  # Recupera datos
-                peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
-                if peso_confirmado is None:
-                    return
-                peso = peso_confirmado
-                
-                peso_neto = abs(peso - peso_inicial)  # Calcula el peso neto
-
-                # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
-                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-
-                # Mensaje tiquete y resultado en pantalla con impresion                
-                contenido = (
-                    f"Pesaje final registrado.\n"
-                    f"{tipo}:\n"
-                    f"ID: {id_ingresado}\n"
-                    f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
-                    f"Peso Final: {peso:.2f} kg — {fecha_actual}\n"
-                    f"Peso Neto: {peso_neto:.2f} kg"
-                )
-                mostrar_tiquete_con_impresion("Resultado", contenido)
-
-                pesajes_confirmados.append((tipo, id_ingresado, peso_inicial, peso, fecha_inicial, fecha_actual))
-                del pesajes_temporales[clave]  # Elimina de pesajes abiertos
-                actualizar_estado_pesajes()  # actualiza la Eliminacion de pesajes abiertos
-                return  # Finaliza la ejecución
-
-            # Paso 4: Preguntar si tendrá cierre (solo si no hay pesaje previo abierto)
-            cerrar = messagebox.askyesno("Cierre", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
-
-            # Si el servicio tendrá cierre de pesaje
-            if cerrar:
-                # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
-                fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                pesajes_temporales[clave] = (peso, fecha_actual)  # Registra pesaje inicial
-                actualizar_estado_pesajes()  # actualizo inicio de pesajes abiertos
-                # mensaje inicio pesaje con impresion                
-                contenido = (
-                    f"Peso inicial registrado: {peso:.2f} kg\n"
-                    f"{tipo}:\n"
-                    f"ID: {id_ingresado}\n"
-                    f"Fecha: {fecha_actual}\n"
-
-                )
-                mostrar_tiquete_con_impresion("Pesaje inicial", contenido)
-
-            else:
-                # Si NO tendrá cierre: se permite cierre manual
-                fecha_peso_inicial = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha inicial
-                peso_manual = simpledialog.askstring("Peso cierre manual", "Ingrese el peso de cierre manual (kg) o deje vacío si no hay peso final:", parent=ventana)
-                if peso_manual and peso_manual.strip().isdigit():
-                    peso_final = int(peso_manual.strip())  # Convierte a entero
-                    fecha_peso_final = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Fecha final
-                    peso_neto = abs(peso_final - peso)  # Calcula neto
-                    # Mensaje tiquete y resultado en pantalla con impresion                                        
-                    contenido = (
-                        f"{tipo}:\n"
-                        f"ID: {id_ingresado}\n"
-                        f"Peso Inicial: {peso:.2f} kg — {fecha_peso_inicial}\n"
-                        f"Peso Final: {peso_final:.2f} kg — {fecha_peso_final}\n"
-                        f"Peso Neto: {peso_neto:.2f} kg"
-                    )
-                    mostrar_tiquete_con_impresion("Pesaje manual", contenido)
-                    #cerrar_proceso_impresion()
-                    pesajes_confirmados.append((tipo, id_ingresado, peso, peso_final, fecha_peso_inicial, fecha_peso_final))
-                else:
-                    # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
-                    fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    # Si no se ingresó peso final manual, solo muestra registro actual con impresion                    
-                    contenido = (
-                        f"{tipo}:\n"
-                        f"ID: {id_ingresado}\n"
-                        f"Peso actual: {peso:.2f} kg\n"
-                        f"Fecha: {fecha_actual}"
-                    )
-                    mostrar_tiquete_con_impresion("Pesaje Registrado", contenido)
-                    #cerrar_proceso_impresion()
-
-
-        # Solicita los mismos datos que Inmuniza/Aserrio, pero solo imprime peso actual para Astillable
-        elif tipo == "Astillable":
-            # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
-            while True:
-                placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
-                if placa is None:
-                    # El usuario presionó "Cancelar" → salir y no continuar con el flujo de este tipo
-                    cerrar_proceso_impresion()
-                    return
-                if placa.strip() == "":
-                    # El usuario presionó "Aceptar" sin escribir → mostrar advertencia
-                    messagebox.showwarning("Campo obligatorio", "Debe ingresar una placa.", parent=ventana)
-                    continue
-                placa = placa.upper()
-                if re.fullmatch(r'[A-Z]{3}\d{3}', placa):
-                    break# ✅ Formato válido
-                else:
-                    # ❌ Formato incorrecto: mostrar error
-                    messagebox.showerror(
-                        "Formato inválido",
-                        "La placa debe tener 3 letras seguidas de 3 números.\n"
-                        "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n\nEjemplo válido: LLL111",
-                        parent=ventana
-                    )
-            # Paso 2: Seleccionar RG o MS como empresa      
-            empresa = tk.StringVar(value="")  # No hay valor por defecto aún
-
-            subventana = tk.Toplevel(ventana)
-            subventana.title("Seleccione Empresa")
-            subventana.geometry("250x130")
-            subventana.attributes("-topmost", True)
-            subventana.resizable(False, False)
-            
-            # Eliminar botones del sistema (cierra y minimiza)
-            subventana.protocol("WM_DELETE_WINDOW", lambda: None)
-            subventana.overrideredirect(True)  # ❌ Oculta bordes y botones (incluyendo minimizar)
-
-            # Fondo con borde simulado (opcional si se usa overrideredirect)
-            marco = tk.Frame(subventana, bd=2, relief="ridge")
-            marco.pack(expand=True, fill="both", padx=5, pady=5)
-
-            tk.Label(marco, text="Seleccione la empresa:", font=("Arial", 11)).pack(pady=10)
-            
-            # Función para selección
-            def seleccionar_empresa(valor):
-                empresa.set(valor)
-                subventana.destroy()
-
-            # Botones
-            tk.Button(marco, text="RG", width=10, command=lambda: seleccionar_empresa("RG")).pack(pady=5)
-            tk.Button(marco, text="MS", width=10, command=lambda: seleccionar_empresa("MS")).pack(pady=5)
-            
-            # Espera hasta selección
-            ventana.wait_window(subventana)
-
-            # Cancelar si no se seleccionó nada
-            if not empresa.get():
-                cerrar_proceso_impresion()
-                return
-
-            
-            # Paso 3: Ingresar número de remisión (solo dígitos)
-            while True:
-                remision = simpledialog.askstring("Remisión", "Ingrese el número de remisión (solo números):", parent=ventana)
-                if remision is None:
-                    cerrar_proceso_impresion()
-                    return
-                if remision.isdigit():
-                    break
-                else:
-                    messagebox.showerror("Inválido", "La remisión debe contener solo números.", parent=ventana)
-
-            
-            # Construir el ID final
-            id_ingresado = f"{placa} {empresa.get()}{remision}".upper()
-            # defino fecha actual con hora, minutos y segundos del momento de inserccion del peso
-            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
-            # Mensaje resultado final impreso en pantalla de astillable con impresion            
-            contenido = (
-                f"Pesaje final registrado.\n"
-                f"{tipo}:\nID: {id_ingresado}\n"
-                f"Peso: {peso:.2f} kg\n"
-                f"Fecha: {fecha_actual}"
-            )
-            mostrar_tiquete_con_impresion("Resultado", contenido)"""
-
-
     # Función que actualiza constantemente el peso en la GUI
     def actualizar_peso_gui():
         peso, hora = obtener_datos_peso()  # Obtiene los datos actuales
@@ -1025,6 +820,14 @@ def modulo_servicio():
     # 🔳 Frame donde se insertarán formularios dinámicos (placa, remisión, RG/MS, etc.)
     frame_formulario = tk.Frame(ventana)
     frame_formulario.pack(pady=10, fill="x")
+    
+    # ✅ Función para limpiar únicamente el formulario embebido (sin afectar botones principales)
+    def limpiar_formulario_unicamente():
+        if frame_formulario:
+            for widget in frame_formulario.winfo_children():
+                widget.destroy()
+            frame_formulario.pack_forget()
+
 
     # 🧾 Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha)
     tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
@@ -1043,12 +846,19 @@ def modulo_servicio():
         selected = tree.selection()
         selected_claves = [tree.item(item, "values")[0] for item in selected]
 
-        tree.delete(*tree.get_children())# limpia tabla
+        tree.delete(*tree.get_children())  # Limpia tabla
+
         for clave, valor in pesajes_temporales.items():
             if isinstance(valor, (list, tuple)) and len(valor) >= 2:
                 peso_ini = valor[0]
                 fecha = valor[1]
-                tree.insert("", "end", values=(clave, f"{peso_ini:.2f}", fecha))
+            elif isinstance(valor, dict) and "peso_entrada" in valor and "fecha_hora_entrada" in valor:
+                peso_ini = valor["peso_entrada"]
+                fecha = valor["fecha_hora_entrada"]
+            else:
+                continue  # Skip si no cumple formato
+
+            tree.insert("", "end", values=(clave, f"{peso_ini:.2f}", fecha))
 
         # Restaurar la selección si todavía existe esa clave
         for item in tree.get_children():
@@ -1056,6 +866,7 @@ def modulo_servicio():
             if clave in selected_claves:
                 tree.selection_add(item)
                 break  # Solo seleccionamos uno
+
 
     
     # Ejecutar refresco periódico cada 500ms
