@@ -4,7 +4,7 @@ from tkinter import ttk  # Módulo para widgets avanzados (Treeview, Combobox, e
 from tkinter import simpledialog, messagebox  # Para cuadros de diálogo simples y mensajes emergentes
 import socket  # Para la comunicación con el módulo que lee el peso (modulo1) Comunicación por red local (localhost)
 import json  # Para interpretar los datos recibidos en formato JSON
-from datetime import datetime  # Para Obtener y registrar fecha y hora
+from datetime import datetime  # 🗓️ Usado Para Obtener y registrar fecha y hora exacta del pesaje
 import re  # Validaciones con expresiones regulares
 import unicodedata  # para permitir caracteres o validación de nombres acentuados
 
@@ -207,8 +207,180 @@ def cerrar_proceso_impresion():
         pass
     frame_subclientes.pack_forget()  # Oculta el submenú si está visible
 
-# Función principal que construye y ejecuta la ventana de servicio del módulo 3
+
+# --------------------------------------------------------------------
+# FORMULARIO EMBEBIDO PARA INGRESO DE DATOS - INMUNIZA, ASERRIO, ASTILLABLE
+# Esta función genera un formulario visual directamente en la ventana
+# principal, solicitando los datos obligatorios para servicios internos:
+#   - Placa (validación formato LLL111)
+#   - Empresa (RG o MS con botones)
+#   - Número de remisión (solo dígitos)
+# Al confirmar, se construye el ID y se llama a `continuar_flujo_pesaje_interno(...)`.
+# También permite cancelar el ingreso, limpiando el formulario y cerrando el proceso activo.
+# --------------------------------------------------------------------
+
+
+# 🔁 Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrio, Astillable
+def mostrar_formulario_interno(tipo, ventana, frame_formulario):
+    # 🔁 Asegura que el frame esté visible incluso si fue ocultado con .pack_forget()
+    frame_formulario.pack(pady=10, fill="x")
+       
+    # Limpiar formulario anterior
+    for widget in frame_formulario.winfo_children():
+        widget.destroy()
+
+    # Título del formulario
+    tk.Label(frame_formulario, text=f"Formulario para {tipo}", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+
+    # Frame de línea horizontal para los 3 campos con etiquetas arriba
+    fila_formulario = tk.Frame(frame_formulario)
+    fila_formulario.pack(fill="x", pady=5)
+    
+    # Entrada: Placa Paso 1:Solicita placa del vehículo (formato ABC123)
+    tk.Label(fila_formulario, text="Placa del vehículo (Ej: ABC123):", anchor="center").grid(row=0, column=0, padx=10)
+    entry_placa = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
+    entry_placa.grid(row=1, column=0, padx=10)
+
+
+    # Entrada: Empresa (RG o MS)
+    tk.Label(fila_formulario, text="Seleccione la empresa:", anchor="center").grid(row=0, column=1, padx=10)
+    # Inicializamos la variable con un valor inválido
+    empresa = tk.StringVar(value="__nulo__")  # ← valor que no coincide con ninguna opción sin seleccion inicial
+    frame_empresa = tk.Frame(fila_formulario)
+    frame_empresa.grid(row=1, column=1, padx=10)
+    tk.Radiobutton(frame_empresa, text="RG", variable=empresa, value="RG").pack(side="left", padx=5)
+    tk.Radiobutton(frame_empresa, text="MS", variable=empresa, value="MS").pack(side="left", padx=5)
+
+
+ 
+    # Entrada: Remisión solo numero
+    tk.Label(fila_formulario, text="Número de remisión (solo números):", anchor="center").grid(row=0, column=2, padx=10)
+    entry_remision = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
+    entry_remision.grid(row=1, column=2, padx=10)
+
+
+    # 🔘 Función crea boton para confirmar los datos y continuar el flujo de pesaje
+    def confirmar_datos():
+        placa = entry_placa.get().strip().upper() # 🔁 Convierte a mayúsculas automáticamente con upper
+        
+        
+        remision = entry_remision.get().strip()
+        empresa_sel = empresa.get()
+
+        # Validación de placa
+        if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
+            messagebox.showerror(
+                "Formato de placa inválido",
+                "La placa debe tener 3 letras seguidas de 3 números.\n"
+                "Ejemplo válido: ABC123\n"
+                "No se permiten símbolos, ni espacios.\n"
+                "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n",
+                parent=ventana
+            )
+            return
+
+        # Validación de empresa
+        if empresa_sel not in ["RG", "MS"]:
+            messagebox.showerror("Error", "Debe seleccionar la empresa (RG o MS).", parent=ventana)
+            return
+
+        # Validación de remisión
+        if not remision.isdigit():
+            messagebox.showerror("Error", "La remisión debe contener solo números.", parent=ventana)
+            return
+        
+        
+        
+        # 🔁 Construimos el ID y clave si todo esta bien
+        id_ingresado = f"{placa} {empresa_sel}{remision}".upper()
+        clave = f"{tipo}:{id_ingresado}"
+        peso, _ = obtener_datos_peso()
+
+        # Continuar con el flujo de lógica normal como si fuera un ingreso valido
+        continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana)
+     
+     # 🔴 Función para boton cancelar del formulario
+    def cancelar():
+        # 🔁 Limpia todo el contenido del frame sin eliminar el contenedor
+        for widget in frame_formulario.winfo_children():
+            widget.destroy()
+
+        # 🔒 Finaliza proceso de impresión
+        cerrar_proceso_impresion()
+
+
+    # Botones de acción
+    frame_botones = tk.Frame(frame_formulario)
+    frame_botones.pack(pady=10)
+
+    tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
+    tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=cancelar).pack(side="left", padx=10)
+
+  
+   
+# 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
+# Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
+# lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.
+def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana):
+    
+    # Cargar archivo de estado
+    archivo_estado = "estado_pesajes.json"
+    
+    try:
+        with open(archivo_estado, "r") as file:
+            estado = json.load(file)
+    except FileNotFoundError:
+        estado = {}
+
+    # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
+    if clave in estado:
+        mostrar_tiquete_con_impresion(estado[clave], clave, tipo, peso, ventana)
+        cerrar_proceso_impresion()
+        return
+
+    # Si no existe, crear nuevo registro
+    
+    # Si es Inmuniza o Aserrio, guardar nuevo pesaje abierto
+    if tipo in ["Inmuniza", "Aserrio"]:
+        estado[clave] = {
+            "tipo": tipo,
+            "id": id_ingresado,
+            "peso_entrada": peso,
+            "fecha_hora_entrada": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        with open(archivo_estado, "w") as file:
+            json.dump(estado, file, indent=4)
+
+        mostrar_tiquete_con_impresion(estado[clave], clave, tipo, peso, ventana)
+
+    else:
+        # si es Astillable: solo imprimir
+        registro_temporal = {
+            "tipo": tipo,
+            "id": id_ingresado,
+            "peso_entrada": peso,
+            "fecha_hora_entrada": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        mostrar_tiquete_con_impresion(registro_temporal, clave, tipo, peso, ventana)
+
+    cerrar_proceso_impresion()
+
+    # ✅ Limpia el formulario visual después de completar
+    for widget in ventana.winfo_children():
+        if isinstance(widget, tk.Frame) and widget != ventana.nametowidget('.!frame'):  # evita tocar los botones
+            for subwidget in widget.winfo_children():
+                subwidget.destroy()
+
+
+# Función principal que construye y ejecuta la ventana de servicio del módulo 3, crea la interfaz del módulo
 def modulo_servicio():
+    
+    # 🔁 Si el archivo puntero quedó por error de una sesión anterior, lo eliminamos
+    if os.path.exists(".proceso_impresion_activo"):
+        os.remove(".proceso_impresion_activo")
+    
     
     # Función que se ejecuta al hacer clic en uno de los botones de servicio
     def verificar_servicio(tipo, cliente_seleccionado=None):
@@ -538,7 +710,13 @@ def modulo_servicio():
 
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
-        elif tipo in ["Inmuniza", "Aserrio"]:
+        elif tipo in ["Inmuniza", "Aserrio", "Astillable"]:
+            mostrar_formulario_interno(tipo, ventana, frame_formulario)
+            return
+
+        
+        """
+        #elif tipo in ["Inmuniza", "Aserrio"]:
             # Paso 1: Ingresar placa del vehículo (formato válido: 3 letras + 3 números)
             while True:
                 placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: LLL111):", parent=ventana)
@@ -786,7 +964,7 @@ def modulo_servicio():
                 f"Peso: {peso:.2f} kg\n"
                 f"Fecha: {fecha_actual}"
             )
-            mostrar_tiquete_con_impresion("Resultado", contenido)
+            mostrar_tiquete_con_impresion("Resultado", contenido)"""
 
 
     # Función que actualiza constantemente el peso en la GUI
@@ -967,41 +1145,34 @@ def modulo_servicio():
 
         if tipo == "Externo":
             
-            if mostrar_clientes.get():
-                # 🔁 Toggle: si ya está visible, lo ocultamos
-                # Si ya está desplegado y no hay proceso activo, lo cerramos
-                if not proceso_impresion_activo():
-                    frame_subclientes.pack_forget()#oculta botones
-                    mostrar_clientes.set(False)
-                else:
-                    messagebox.showinfo("Proceso activo", "Debe finalizar el proceso de ingreso antes de cerrar este menú.")
-                return
- 
-            #if mostrar_clientes.get():
-                #frame_subclientes.pack_forget()#oculta botones
-                #mostrar_clientes.set(False)
-                #cerrar_proceso_impresion() #quita el archivo puntero para finalizar proceso de impresion
-            else:
-                 # 🔒 Activar archivo que indica proceso de ingreso de datos(creo archivo puntero)
-                with open(".proceso_impresion_activo", "w") as f:
-                    f.write("1")
-                
-                # Mostrar botones de cliente
-                for widget in frame_subclientes.winfo_children():
-                    widget.destroy()
+            # 🔒 Activar archivo que indica proceso de ingreso de datos(creo archivo puntero)
+            with open(".proceso_impresion_activo", "w") as f:
+                f.write("1")
 
-                tk.Label(frame_subclientes, text="Seleccione el cliente externo:",
-                        font=("Arial", 10)).pack(pady=(0, 5))
+            # Limpiar y mostrar botones de cliente
+            for widget in frame_subclientes.winfo_children():
+                widget.destroy()
 
-                for nombre_cliente in clientes_externos:
-                    tk.Button(frame_subclientes, text=nombre_cliente,
-                            width=30, font=("Arial", 9),
-                            command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
-                            ).pack(pady=2)
+            tk.Label(frame_subclientes, text="Seleccione el cliente externo:",
+                    font=("Arial", 10)).pack(pady=(0, 5))
 
-                frame_subclientes.pack()
-                mostrar_clientes.set(True)
+            for nombre_cliente in clientes_externos:
+                tk.Button(frame_subclientes, text=nombre_cliente,
+                        width=30, font=("Arial", 9),
+                        command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
+                        ).pack(pady=2)
 
+            # 🔘 Botón cancelar para cerrar submenú de clientes
+            def cancelar_clientes():
+                frame_subclientes.pack_forget()
+                cerrar_proceso_impresion()  # Elimina archivo puntero
+                mostrar_clientes.set(False)
+
+            tk.Button(frame_subclientes, text="❌ Cancelar", font=("Arial", 10),
+                    command=cancelar_clientes).pack(pady=(10, 5))
+
+            frame_subclientes.pack()
+            mostrar_clientes.set(True)
         else:
             # 🔒 Activar proceso para los otros botones principales
             with open(".proceso_impresion_activo", "w") as f:
@@ -1012,18 +1183,28 @@ def modulo_servicio():
             mostrar_clientes.set(False)
             verificar_servicio(tipo)
     
-    tipos = ["Externo", "Inmuniza", "Aserrio", "Astillable"]
+    
+    
+    
+    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable"]
     for tipo in tipos:
         tk.Button(frame_botones, text=tipo, width=10, font=("Arial", 9),
                 command=lambda t=tipo: manejar_servicio(t)).pack(side="left", padx=5)
  
-    #frame_botones = tk.Frame(ventana)  # Contenedor horizontal de botones
-    #frame_botones.pack(pady=5)
+    # 🔻 Contenedor reservado para los formularios embebidos
+    # Esto asegura que siempre aparezca debajo de los botones principales
+    frame_formulario = tk.Frame(ventana)
+    frame_formulario.pack(pady=10, fill="x")
 
-    #tipos = ["Externo", "Inmuniza", "Aserrio", "Astillable"]
-    #for tipo in tipos:
-        #tk.Button(frame_botones, text=tipo, width=15, font=("Arial", 11),
-                  #command=lambda t=tipo: verificar_servicio(t)).pack(side="left", padx=5)
+    # 🔻 Contenedor para mostrar pesajes abiertos o resultados
+    # Esto aparecerá siempre debajo del formulario
+    frame_estado_pesajes = tk.Frame(ventana)
+    frame_estado_pesajes.pack(pady=10)
+
+    # Aquí puedes seguir con la carga o visualización del estado actual de los pesajes
+    # (por ejemplo usando `estado_pesajes.cargar_pesajes_abiertos(frame_estado_pesajes)` si tienes esa lógica separada)
+
+    
 
     ventana.mainloop()  # Inicia el bucle principal de la ventana (la mantiene abierta)
 
