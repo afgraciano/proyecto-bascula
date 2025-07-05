@@ -30,7 +30,7 @@ El sistema permite capturar el peso inicial y final de los vehículos conectando
 - Interfaz construida en Tkinter.
 - Permite registrar datos del pesaje (peso inicial y final), seleccionar tipo de servicio, generar e imprimir tiquetes automáticamente.
 - Integra autenticación de usuarios, almacenamiento en JSON y conexión a bases de datos Access y MySQL.
-- Incluye control de sesiones y protección contra inyecciones SQL.
+- Incluye control de sesiones.
 
 ---
 
@@ -39,7 +39,7 @@ El sistema permite capturar el peso inicial y final de los vehículos conectando
 - **Python 3.9**
 - **Tkinter** – Interfaz gráfica
 - **PySerial** – Comunicación con puertos COM
-- **PyODBC / PyMySQL** – Conexión con bases de datos Access y MySQL
+- **PyODBC / PyMySQL** – Conexión con bases de datos Access y/o MySQL
 - **com0com** – Simulación de puertos seriales
 - **VS Code** – Entorno de desarrollo
 - **Zebra / impresoras térmicas** – Generación de tiquetes físicos
@@ -50,7 +50,6 @@ El sistema permite capturar el peso inicial y final de los vehículos conectando
 
 - Autenticación por credenciales de usuario
 - Registro de acciones realizadas por cada usuario (trazabilidad)
-- Prevención de ataques de inyección SQL mediante validaciones y consultas parametrizadas
 
 ---
 
@@ -77,8 +76,11 @@ El sistema permite capturar el peso inicial y final de los vehículos conectando
 ├── modulo1_lector_unificado.py
 ├── modulo2_config.py
 ├── README.md
+├── test_com0com.py
+├── config_com.txt
+├── estado_actual_pesajes.json
 └── docs/
-    └── PropuestaProyectoPractica_AndresGracianoFinal.pdf
+    └── PropuestaProyectoPractica_AndresGracianoGit.pdf
 ```
 
 ---
@@ -101,4 +103,4 @@ Este proyecto fue desarrollado como parte de la práctica empresarial del progra
 ## 🤝 Contacto
 
 - **Correo institucional**: felipe.graciano@udea.edu.co  
-- **GitHub (autor)**: [Andrés Graciano](https://github.com/tu-usuario-aqui)
+- **GitHub (autor)**: [Andrés Graciano](https://github.com/afgraciano)
