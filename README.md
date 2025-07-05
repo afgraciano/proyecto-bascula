@@ -29,7 +29,7 @@ El sistema permite capturar el peso inicial y final de los vehículos conectando
 ### 3. 🖥️ Sistema de Pesaje con Interfaz Gráfica (`modulo3_servicio_unificado.py`)
 - Interfaz construida en Tkinter.
 - Permite registrar datos del pesaje (peso inicial y final), seleccionar tipo de servicio, generar e imprimir tiquetes automáticamente.
-- Integra autenticación de usuarios, almacenamiento en JSON y conexión a bases de datos Access y MySQL.
+- Integra autenticación de usuarios, almacenamiento en JSON y conexión a bases de datos Access y/o MySQL.
 - Incluye control de sesiones.
 
 ---
