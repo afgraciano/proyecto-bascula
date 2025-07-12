@@ -177,13 +177,20 @@ cargar_estado_pesajes()
 def obtener_datos_peso():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect(("127.0.0.1", 5000))  # Conecta al servidor en localhost, puerto 5000
-            data = s.recv(1024)  # Recibe los datos (máx 1024 bytes)
-            resultado = json.loads(data.decode())  # Decodifica el JSON recibido
-            return resultado.get("peso", 0), resultado.get("timestamp", "")
+            s.connect(("127.0.0.1", 5000))
+            data = s.recv(1024)
+            resultado = json.loads(data.decode())
+            peso = resultado.get("peso", 0)
+            if peso is None:
+                peso = 0
+            return peso, resultado.get("timestamp", "")
     except:
-        return 0, "" 
-   
+        return 0, ""
+ 
+
+# variable global para captura de peso
+peso_capturado_global = None
+
     
 # Función para confirmar o permitir ingreso manual si el peso es bajo
 def confirmar_o_pedir_peso(peso, ventana):
@@ -307,7 +314,12 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         # 🔁 Construimos el ID y clave si todo esta bien
         id_ingresado = f"{placa} {empresa_sel}{remision}".upper()
         clave = f"{tipo}:{id_ingresado}"
-        peso, _ = obtener_datos_peso()
+        #peso, _ = obtener_datos_peso()
+        #adquiero de la variable global el peso antes capturado
+        global peso_capturado_global
+        print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
+        peso = peso_capturado_global
+
 
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
         # Llama a función unificada que maneja apertura o cierre manual
@@ -337,8 +349,6 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=cancelar).pack(side="left", padx=10)
 
-  
-   
 # 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.
@@ -442,6 +452,243 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 
 
 
+# --------------------------------------------------------------------
+# FORMULARIO EMBEBIDO PARA CLIENTES EXTERNOS DE PAGO MENSUAL
+# Esta función muestra un formulario para los clientes:
+#   - Cipreses de Colombia
+#   - Núcleos de Madera
+#   - Construinmuniza
+# Permite registrar un pesaje inicial o hacer el cierre (manual o automático).
+# Se genera un tiquete al finalizar, y el estado se guarda o actualiza en el JSON.
+# --------------------------------------------------------------------
+
+# 🔁 Función que crea y muestra el formulario visual estándar para Externos (cipreses de colombia, nucleos de colombia, construinmuniza )
+def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame_formulario, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+    
+
+    
+    # 🔁 Asegura que el frame esté visible incluso si fue ocultado
+    frame_formulario.pack(pady=10, fill="x")
+    
+    # 🔁 Limpia el contenido anterior, Limpiar formulario anterior
+    for widget in frame_formulario.winfo_children():
+        widget.destroy()
+    
+    
+    # Título del formulario
+    tk.Label(frame_formulario, text=f"{cliente_nombre} — Formulario de Pesaje", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+
+    # Frame de línea horizontal para los campos con etiquetas arriba
+    fila_formulario = tk.Frame(frame_formulario)
+    fila_formulario.pack(fill="x", pady=5)
+
+    # Placa
+    tk.Label(fila_formulario, text="Placa del vehículo (Ej: ABC123):", anchor="center").grid(row=0, column=0, padx=10)
+    entry_placa = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
+    entry_placa.grid(row=1, column=0, padx=10)
+
+    # Remisión (opcional)
+    tk.Label(fila_formulario, text="Remisión:").grid(row=0, column=1, padx=10)
+    entry_remision = tk.Entry(fila_formulario, width=12, font=("Arial", 10))
+    entry_remision.grid(row=1, column=1, padx=10)
+    
+    # 🔁 Mover foco de placa → remisión al presionar Enter
+    #entry_placa.bind("<Return>", lambda event: entry_remision.focus_set())
+    def validar_placa_y_mover_a_remision(event=None):
+        placa = entry_placa.get().strip().upper()
+        if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
+            messagebox.showerror(
+                "Formato de placa inválido",
+                "La placa debe tener 3 letras seguidas de 3 números.\n"
+                "Ejemplo válido: ABC123\n"
+                "No se permiten símbolos, ni espacios.\n"
+                "No se permiten letras en la parte numérica ni números en la parte de letras.\n",
+                parent=ventana
+            )
+            entry_placa.focus_set()
+            return
+        entry_remision.focus_set()
+
+    entry_placa.bind("<Return>", validar_placa_y_mover_a_remision)
+
+    
+
+    # 🧩 Manejo de Enter en remisión con validación si está vacía
+    """def validar_remision_y_confirmar(event=None):
+        remision = entry_remision.get().strip().upper()
+        if not remision:
+            continuar = messagebox.askyesno(
+                "¿Sin remisión?",
+                "No se ingresó remisión.\n¿Desea continuar sin ella?",
+                parent=ventana
+            )
+            if not continuar:
+                entry_remision.focus_set()
+                return
+        confirmar_datos()"""
+    #al presiona enter en remision llama a validar la remision y confirmar
+    #entry_remision.bind("<Return>", validar_remision_y_confirmar)
+    entry_remision.bind("<Return>", lambda event: confirmar_datos())
+
+
+    
+    # 🔘 Función crea boton para confirmar los datos y continuar el flujo de pesaje
+    def confirmar_datos():        
+        placa = entry_placa.get().strip().upper()# 🔁 Convierte a mayúsculas automáticamente con upper 
+        remision = entry_remision.get().strip().upper()# 🔁 Convierte a mayúsculas automáticamente con upper 
+        
+        
+        # 🧪 Validación de placa
+        if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
+            messagebox.showerror(
+                "Formato de placa inválido",
+                "La placa debe tener 3 letras seguidas de 3 números.\n"
+                "Ejemplo válido: ABC123\n"
+                "No se permiten símbolos, ni espacios.\n"
+                "No se permiten letras en la parte numérica ni numeros en la parte de letras.\n",
+                parent=ventana
+            )
+            return
+        
+        # 🧪 Validación de remisión 1 (si se ingresó)
+        # Validación de remisión (si se ingresó, debe tener letras/números/espacios)
+        if remision and not re.fullmatch(r"[A-Z0-9 ]+", remision):
+            messagebox.showerror("Error", "La remisión solo puede contener letras, números y espacios.", parent=ventana)
+            return
+        #validacion de remision2
+        # ✅ Si NO hay remisión, preguntar si desea continuar sin ella
+        if not remision:
+            continuar = messagebox.askyesno("¿Sin remisión?", "No se ingresó remisión.\n¿Desea continuar sin ella?", parent=ventana)
+            if not continuar:
+                entry_remision.focus_set()  # ← Regresa el foco al campo remisión
+                return
+        
+        
+        # 🔁 Construimos el ID y clave si todo esta bien
+        id_ingresado = f"{placa} {remision}".strip()# ← Si no hay remisión, queda solo la placa
+        clave = f"{tipo}:{cliente_nombre}:{id_ingresado}"
+        
+        #adquiero de la variable global el peso antes capturado
+        global peso_capturado_global
+        print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
+        peso = peso_capturado_global
+        print(f"[DEBUG] peso_capturado_global al confirmar formulario igualando peso: {peso_capturado_global}")
+
+
+        # Continuar con el flujo de lógica normal como si fuera un ingreso valido
+        # Llama a función unificada que maneja apertura o cierre manual
+        continuar_flujo_pesaje_externo( 
+                       
+            tipo=tipo,
+            clave=clave,
+            id_ingresado=id_ingresado,
+            peso=peso,
+            ventana=ventana,
+            refrescar_tabla_pesajes=refrescar_tabla_pesajes,
+            limpiar_formulario_unicamente=limpiar_formulario_unicamente)
+   
+
+            
+            
+    # 🔴 Función para boton cancelar del formulario
+    def cancelar():
+        frame_formulario.pack_forget()
+        cerrar_proceso_impresion()
+
+
+    # Botones de acción
+    frame_botones = tk.Frame(frame_formulario)
+    frame_botones.pack(pady=10)
+
+    tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
+    tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=cancelar).pack(side="left", padx=10)
+    #entry_remision.bind("<Return>", lambda event: confirmar_datos())
+  
+  
+# 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
+# Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
+# lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.   
+def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+    archivo_estado = "estado_actual_pesajes.json"
+
+    try:
+        with open(archivo_estado, "r") as file:
+            estado = json.load(file)
+    except FileNotFoundError:
+        estado = {}
+
+    # 📌 Si ya existe el pesaje → CIERRE
+    if clave in estado:
+        peso_inicial = estado[clave]["peso_entrada"]
+        fecha_inicial = estado[clave]["fecha_hora_entrada"]
+
+        # ✅ Solución a NoneType error
+        if peso is None:
+            peso = 0  # O lanza advertencia si lo prefieres
+            
+        # Preguntar si desea cerrar con este peso o ingresar uno manual
+        peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+        if peso_confirmado is None:
+            return  # Usuario canceló
+
+
+
+        peso_final = peso_confirmado
+        peso_neto = abs(peso_final - peso_inicial)
+        fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        del estado[clave]  # 🔁 Elimina el registro cerrado
+
+        with open(archivo_estado, "w") as file:
+            json.dump(estado, file, indent=4)
+
+        actualizar_estado_pesajes()
+
+        contenido = (
+            f"Pesaje cerrado:\n"
+            f"{tipo}:\n"
+            f"ID: {id_ingresado}\n"
+            f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
+            f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
+            f"Peso Neto: {peso_neto:.2f} kg"
+        )
+        mostrar_tiquete_con_impresion("Resultado", contenido)
+
+        if refrescar_tabla_pesajes:
+            refrescar_tabla_pesajes()
+        if limpiar_formulario_unicamente:
+            limpiar_formulario_unicamente()
+        return
+
+    # 🟢 REGISTRO NUEVO → PESAJE INICIAL
+    fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    estado[clave] = {
+        "tipo": tipo,
+        "id": id_ingresado,
+        "peso_entrada": peso,
+        "fecha_hora_entrada": fecha_entrada
+    }
+
+    with open(archivo_estado, "w") as file:
+        json.dump(estado, file, indent=4)
+
+    actualizar_estado_pesajes()
+
+    contenido = (
+        f"Pesaje inicial registrado:\n"
+        f"{tipo}:\n"
+        f"ID: {id_ingresado}\n"
+        f"Peso Inicial: {peso:.2f} kg — {fecha_entrada}"
+    )
+    mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
+
+    if refrescar_tabla_pesajes:
+        refrescar_tabla_pesajes()
+    if limpiar_formulario_unicamente:
+        limpiar_formulario_unicamente()
+
+
+
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3, crea la interfaz del módulo
 def modulo_servicio():
     
@@ -454,9 +701,22 @@ def modulo_servicio():
     def verificar_servicio(tipo, cliente_seleccionado=None):
         frame_subclientes.pack_forget()  # 🔁 Siempre cerrar sub-botones al iniciar el flujo
         
+        # ✅ Siempre capturamos el peso actual al presionar un botón principal en variable global
+        global peso_capturado_global
+        print(f"[DEBUG] peso_capturado_global al presionar botones principales: {peso_capturado_global}")
+        peso_capturado_global, _ = obtener_datos_peso()
+        print(f"[DEBUG] peso_capturado_global al obtener datos de peso {peso_capturado_global}")
+        if peso_capturado_global is None:
+            peso_capturado_global = 0
+            print(f"[DEBUG] peso_capturado_global al obtener datos de peso si es none{peso_capturado_global}")
+        #global peso_capturado_global
+        #if peso_capturado_global is None:
+            #peso_capturado_global, _ = obtener_datos_peso()
+            #print(f"[DEBUG] peso_capturado_global al obtener datos de peso {peso_capturado_global}")
+
+
         
-          
-        peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
+        #peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
 
         # Si el tipo de servicio es externo con subtipos
         if tipo == "Externo":
@@ -479,7 +739,7 @@ def modulo_servicio():
             
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
             # comportamiento para Tercero (pago inmediato)
-            if cliente.get() == "Tercero (pago inmediato)":
+            """if cliente.get() == "Tercero (pago inmediato)":
 
                 # Paso 1:Solicita placa del vehículo (formato LLL111)
                 while True:
@@ -647,12 +907,12 @@ def modulo_servicio():
                         )
                         mostrar_tiquete_con_impresion("Pesaje registrado", contenido)
                         #cerrar_proceso_impresion()                        
-                return  # Fin del flujo 
+                return """ # Fin del flujo
               
 
             # Lógica para externos con pago mensual (Cipreses, Núcleos, Construinmuniza)
             # Solicita placa (formato LLL111) y pregunta si habrá cierre de pesaje
-            while True:
+            """while True:
                 placa = simpledialog.askstring("Placa", "Ingrese la placa del vehículo (Ej: ABC123):", parent=ventana)
                 if placa is None:
                     cerrar_proceso_impresion()
@@ -753,7 +1013,7 @@ def modulo_servicio():
                         f"Tipo de pago: {tipo_pago}"
                     )
                     mostrar_tiquete_con_impresion("Pesaje registrado", contenido)
-                    #cerrar_proceso_impresion()
+                    #cerrar_proceso_impresion()"""
 
 
         # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
@@ -937,9 +1197,16 @@ def modulo_servicio():
     }
 
     # Función llamada al seleccionar cliente
+    
     def seleccionar_cliente_externo(nombre_cliente):
-        frame_subclientes.pack_forget()  # Oculta los sub-botones al seleccionar
-        verificar_servicio("Externo", cliente_seleccionado=nombre_cliente)
+        frame_subclientes.pack_forget()
+        if nombre_cliente in ["Cipreses de Colombia", "Núcleos de Madera", "Construinmuniza"]:
+            mostrar_formulario_externo_pago_mensual(
+                nombre_cliente, "Externo", ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente
+            )
+        else:
+            verificar_servicio("Externo", cliente_seleccionado=nombre_cliente)
+
 
     #declaro variable booleanda para controlar estado de visibilidad de botones clientes
     mostrar_clientes = tk.BooleanVar(value=False)  # Estado inicial: oculto
@@ -960,6 +1227,8 @@ def modulo_servicio():
             with open(".proceso_impresion_activo", "w") as f:
                 f.write("1")
 
+            verificar_servicio(tipo) #funcion para capturar peso actual en variable global
+            
             # Limpiar y mostrar botones de cliente
             for widget in frame_subclientes.winfo_children():
                 widget.destroy()
@@ -992,7 +1261,8 @@ def modulo_servicio():
             # Otro tipo de servicio → ocultar subclientes si estaban abiertos
             frame_subclientes.pack_forget()#oculta botones
             mostrar_clientes.set(False)
-            verificar_servicio(tipo)
+            
+            verificar_servicio(tipo) #funcion para capturar peso actual en variable global
     
     
     
@@ -1012,12 +1282,10 @@ def modulo_servicio():
     frame_estado_pesajes = tk.Frame(ventana)
     frame_estado_pesajes.pack(pady=10)
 
-    # Aquí puedes seguir con la carga o visualización del estado actual de los pesajes
-    # (por ejemplo usando `estado_pesajes.cargar_pesajes_abiertos(frame_estado_pesajes)` si tienes esa lógica separada)
-
-    
+      
 
     ventana.mainloop()  # Inicia el bucle principal de la ventana (la mantiene abierta)
+
 
 # Si el archivo se ejecuta directamente, se lanza la función de servicio
 if __name__ == "__main__":
