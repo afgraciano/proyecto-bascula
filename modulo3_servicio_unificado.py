@@ -514,20 +514,7 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
     
 
     # 🧩 Manejo de Enter en remisión con validación si está vacía
-    """def validar_remision_y_confirmar(event=None):
-        remision = entry_remision.get().strip().upper()
-        if not remision:
-            continuar = messagebox.askyesno(
-                "¿Sin remisión?",
-                "No se ingresó remisión.\n¿Desea continuar sin ella?",
-                parent=ventana
-            )
-            if not continuar:
-                entry_remision.focus_set()
-                return
-        confirmar_datos()"""
     #al presiona enter en remision llama a validar la remision y confirmar
-    #entry_remision.bind("<Return>", validar_remision_y_confirmar)
     entry_remision.bind("<Return>", lambda event: confirmar_datos())
 
 
@@ -687,8 +674,270 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
     if limpiar_formulario_unicamente:
         limpiar_formulario_unicamente()
 
+# --------------------------------------------------------------------
+# FORMULARIO EMBEBIDO PARA CLIENTES EXTERNOS DE PAGO INMEDIATO
+# Esta función muestra un formulario para el cliente:
+#   - Tercero (pago inmediato)
+# Permite registrar:
+#   - Placa del vehículo (obligatoria)
+#   - Remisión (opcional)
+#   - Razón social (obligatoria)
+#   - NIT o cédula (obligatorio)
+#   - Correo electrónico (opcional y validado)
+# El sistema pregunta si el servicio tendrá cierre:
+#   - Si SÍ, registra un pesaje inicial en el JSON (estado_actual_pesajes.json)
+#   - Si NO, permite ingresar peso manual o usar el peso actual como cierre
+# Si el ID ya existe, cierra automáticamente el pesaje con confirmación.
+# Se genera un tiquete al finalizar (entrada o cierre), y se actualiza el estado.
+# --------------------------------------------------------------------
+
+def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_formulario, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+    # Asegura visibilidad del frame, Mostrar y limpiar el formulario
+    frame_formulario.pack(pady=10, fill="x")
+    for widget in frame_formulario.winfo_children():
+        widget.destroy()
+
+    # Título
+    tk.Label(frame_formulario, text="Tercero — Pago Inmediato", font=("Arial", 12, "bold")).pack(pady=(0, 10))
+    fila_formulario = tk.Frame(frame_formulario)
+    fila_formulario.pack(fill="x", pady=5)
+
+    # Entradas en campos del formulario
+    tk.Label(fila_formulario, text="Placa del vehículo (Ej: ABC123):").grid(row=0, column=0, padx=10)
+    entry_placa = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
+    entry_placa.grid(row=1, column=0, padx=10)
+
+    tk.Label(fila_formulario, text="Remisión (opcional):").grid(row=0, column=1, padx=10)
+    entry_remision = tk.Entry(fila_formulario, width=15, font=("Arial", 10))
+    entry_remision.grid(row=1, column=1, padx=10)
+
+    tk.Label(fila_formulario, text="Nombre o Razón social:").grid(row=0, column=2, padx=10)
+    entry_nombre = tk.Entry(fila_formulario, width=25, font=("Arial", 10))
+    entry_nombre.grid(row=1, column=2, padx=10)
+
+    tk.Label(fila_formulario, text="NIT o Cédula:").grid(row=0, column=3, padx=10)
+    entry_nit = tk.Entry(fila_formulario, width=15, font=("Arial", 10))
+    entry_nit.grid(row=1, column=3, padx=10)
+
+    tk.Label(fila_formulario, text="Correo electrónico (opcional):").grid(row=0, column=4, padx=10)
+    entry_correo = tk.Entry(fila_formulario, width=25, font=("Arial", 10))
+    entry_correo.grid(row=1, column=4, padx=10)
 
 
+    # 🔁 Navegación automática con validaciones parciales al presionar Enter
+    def validar_placa_y_mover(event=None):
+        placa = entry_placa.get().strip().upper()
+        if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
+            messagebox.showerror("Placa inválida", "Debe ingresar una placa válida con formato LLL123 (Ej: ABC123).", parent=ventana)
+            entry_placa.focus_set()
+            return
+        entry_remision.focus_set()
+
+    def validar_nombre_y_mover(event=None):
+        razon = entry_nombre.get().strip()
+        if not razon:
+            messagebox.showerror("Campo obligatorio", "Debe ingresar el nombre o razón social.", parent=ventana)
+            entry_nombre.focus_set()
+            return
+        if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .,'&-]+", razon):
+            messagebox.showerror("Error", "Nombre o razón social contiene caracteres inválidos.", parent=ventana)
+            entry_nombre.focus_set()
+            return
+        entry_nit.focus_set()
+
+    def validar_nit_y_mover(event=None):
+        nit = entry_nit.get().strip()
+        if not nit.isdigit():
+            messagebox.showerror("Error", "El NIT o cédula debe contener solo números.", parent=ventana)
+            entry_nit.focus_set()
+            return
+        entry_correo.focus_set()
+
+    entry_placa.bind("<Return>", validar_placa_y_mover)
+    entry_remision.bind("<Return>", lambda e: entry_nombre.focus_set())
+    entry_nombre.bind("<Return>", validar_nombre_y_mover)
+    entry_nit.bind("<Return>", validar_nit_y_mover)
+    entry_correo.bind("<Return>", lambda e: confirmar_datos())
+
+
+    # Función que se ejecuta al confirmar
+    def confirmar_datos():
+        placa = entry_placa.get().strip().upper()
+        remision = entry_remision.get().strip().upper()
+        razon = entry_nombre.get().strip()
+        nit = entry_nit.get().strip()
+        correo = entry_correo.get().strip()
+
+        # Validaciones
+        if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
+            messagebox.showerror("Error", "Placa inválida. Ej: ABC123", parent=ventana)
+            entry_placa.focus_set()
+            return
+
+        if remision and not re.fullmatch(r"[A-Z0-9 ]+", remision):
+            messagebox.showerror("Error", "Remisión solo puede contener letras, números y espacios.", parent=ventana)
+            entry_remision.focus_set()
+            return
+
+        if not razon:
+            messagebox.showerror("Error", "Debe ingresar razón social o nombre.", parent=ventana)
+            entry_nombre.focus_set()
+            return
+
+
+        if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .,'&-]+", razon):
+            messagebox.showerror("Error", "Razón social contiene caracteres inválidos.", parent=ventana)
+            entry_nombre.focus_set()
+            return
+
+        # Capitalizar razon si no está en mayúsculas
+        if not razon.isupper():
+            razon = ' '.join(p.capitalize() for p in razon.split())
+
+        if not nit.isdigit():
+            messagebox.showerror("Error", "NIT o cédula solo debe contener números.", parent=ventana)
+            entry_nit.focus_set()
+            return
+
+        if correo and not re.fullmatch(r"[\w\.-]+@[\w\.-]+\.\w+", correo):
+            messagebox.showwarning("Correo inválido", "Formato incorrecto de correo.", parent=ventana)
+            entry_correo.focus_set()
+            return
+
+        id_final = f"{placa} {remision}".strip()
+        clave = f"{tipo}:{cliente_nombre}:{id_final}"
+
+        global peso_capturado_global
+        peso = peso_capturado_global
+        print(f"[DEBUG] peso_capturado_global al confirmar formulario TERCERO: {peso}")
+
+        # 🟡 Si ya hay pesaje iniciado → hacer cierre automático sin preguntar por inicio
+        try:
+            with open("estado_actual_pesajes.json", "r") as file:
+                estado = json.load(file)
+        except FileNotFoundError:
+            estado = {}
+            
+            
+        # ------------------------------------------
+        # 🔁 CIERRE AUTOMÁTICO SI YA EXISTE PESAJE
+        # ------------------------------------------
+        if clave in estado:
+            peso_ini = estado[clave]["peso_entrada"]
+            fecha_ini = estado[clave]["fecha_hora_entrada"]
+            razon = estado[clave].get("razon", razon)
+            nit = estado[clave].get("nit", nit)
+            correo = estado[clave].get("correo", correo)
+
+            peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
+            if peso_confirmado is None:
+                return
+
+            peso_final = peso_confirmado
+            peso_neto = abs(peso_final - peso_ini)
+            fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            del estado[clave]
+            with open("estado_actual_pesajes.json", "w") as file:
+                json.dump(estado, file, indent=4)
+
+            actualizar_estado_pesajes()
+            contenido = (
+                f"Cliente: {razon}\n"
+                f"NIT: {nit}\n"
+                f"Correo: {correo}\n"
+                f"ID: {id_final}\n"
+                f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
+                f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
+                f"Peso Neto: {peso_neto:.2f} kg"
+            )
+            mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
+            if refrescar_tabla_pesajes:
+                refrescar_tabla_pesajes()
+            if limpiar_formulario_unicamente:
+                limpiar_formulario_unicamente()
+            return
+
+        # 🔘nuevo pesaje,  Si no existe, preguntamos si tendrá cierre
+        cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
+
+        if cerrar:
+            fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            estado[clave] = {
+                "tipo": tipo,
+                "id": id_final,
+                "peso_entrada": peso,
+                "fecha_hora_entrada": fecha_actual,
+                "razon": razon,
+                "nit": nit,
+                "correo": correo
+            }
+
+            with open("estado_actual_pesajes.json", "w") as file:
+                json.dump(estado, file, indent=4)
+
+            actualizar_estado_pesajes()
+            contenido = (
+                f"Cliente: {razon}\n"
+                f"NIT: {nit}\n"
+                f"Correo: {correo}\n"
+                f"ID: {id_final}\n"
+                f"Peso inicial registrado: {peso:.2f} kg\n"
+                f"Fecha: {fecha_actual}"
+            )
+            mostrar_tiquete_con_impresion("Pesaje inicial", contenido)
+        else:
+            fecha_ini = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            peso_manual = simpledialog.askstring("Peso manual", "Ingrese el peso de cierre manual (kg):", parent=ventana)
+            if peso_manual and peso_manual.isdigit():
+                peso_final = int(peso_manual)
+                peso_neto = abs(peso_final - peso)
+                fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                contenido = (
+                    f"Cliente: {razon}\n"
+                    f"NIT: {nit}\n"
+                    f"Correo: {correo}\n"
+                    f"ID: {id_final}\n"
+                    f"Peso Inicial: {peso:.2f} kg — {fecha_ini}\n"
+                    f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
+                    f"Peso Neto: {peso_neto:.2f} kg"
+                )
+                mostrar_tiquete_con_impresion("Pesaje manual", contenido)
+            else:
+                fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                contenido = (
+                    f"Cliente: {razon}\n"
+                    f"NIT: {nit}\n"
+                    f"Correo: {correo}\n"
+                    f"ID: {id_final}\n"
+                    f"Peso actual: {peso:.2f} kg\n"
+                    f"Fecha: {fecha_actual}"
+                )
+                mostrar_tiquete_con_impresion("Pesaje registrado", contenido)
+
+        if refrescar_tabla_pesajes:
+            refrescar_tabla_pesajes()
+        if limpiar_formulario_unicamente:
+            limpiar_formulario_unicamente()
+
+    # Botones
+    frame_botones = tk.Frame(frame_formulario)
+    frame_botones.pack(pady=10)
+    tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
+    tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=lambda: (frame_formulario.pack_forget(), cerrar_proceso_impresion())).pack(side="left", padx=10)
+
+
+# --------------------------------------------------------------------
+# VENTANA PRINCIPAL DEL MÓDULO 3 – SERVICIO DE BÁSCULA
+# Esta función construye y lanza la interfaz principal del sistema de pesajes.
+# Aquí se gestionan:
+#   - La captura del peso en tiempo real desde el socket
+#   - La activación de los formularios embebidos por tipo de servicio
+#   - El control de los botones principales (Externo, Aserrio, Inmuniza, Astillable)
+#   - La visualización y refresco de pesajes abiertos en una tabla
+#   - La impresión de tiquetes y control de estados
+# También se asegura que solo se pueda realizar un proceso de pesaje activo a la vez.
+# --------------------------------------------------------------------
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3, crea la interfaz del módulo
 def modulo_servicio():
     
@@ -709,15 +958,9 @@ def modulo_servicio():
         if peso_capturado_global is None:
             peso_capturado_global = 0
             print(f"[DEBUG] peso_capturado_global al obtener datos de peso si es none{peso_capturado_global}")
-        #global peso_capturado_global
-        #if peso_capturado_global is None:
-            #peso_capturado_global, _ = obtener_datos_peso()
-            #print(f"[DEBUG] peso_capturado_global al obtener datos de peso {peso_capturado_global}")
-
-
-        
-        #peso, _ = obtener_datos_peso()  # Obtiene el peso actual del socket
-
+ 
+ 
+ 
         # Si el tipo de servicio es externo con subtipos
         if tipo == "Externo":
             # Submenú para distinguir tipo de externo
@@ -1200,7 +1443,14 @@ def modulo_servicio():
     
     def seleccionar_cliente_externo(nombre_cliente):
         frame_subclientes.pack_forget()
-        if nombre_cliente in ["Cipreses de Colombia", "Núcleos de Madera", "Construinmuniza"]:
+        
+        # 👉 condición para externos Tercero (pago inmediato)
+        if nombre_cliente == "Tercero (pago inmediato)":
+            mostrar_formulario_externo_tercero(
+                nombre_cliente, "Externo", ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente
+            )
+        # 👉 condición para externos (pago mensual)
+        elif nombre_cliente in ["Cipreses de Colombia", "Núcleos de Madera", "Construinmuniza"]:
             mostrar_formulario_externo_pago_mensual(
                 nombre_cliente, "Externo", ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente
             )

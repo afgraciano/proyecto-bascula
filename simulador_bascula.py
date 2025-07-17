@@ -6,9 +6,11 @@ from tkinter import ttk
 import threading
 from datetime import datetime
 import os
+from tkinter import messagebox #agregado nuevo
 
 # Estado de simulación
 simulando = [False]
+hilo_simulacion = [None]  # Para guardar referencia al hilo activo
 peso_actual = [0]
 peso_objetivo = [0]
 puerto_simulado = ['COM6']
@@ -32,6 +34,13 @@ def guardar_com_actual():
     with open(archivo_config, "w") as f:
         f.write(puerto_simulado[0])
         print(f"💾 COM guardado: {puerto_simulado[0]}")
+        
+#agregado nuevo
+# Verifica si el COM existe físicamente
+def puerto_existe(puerto):
+    disponibles = [p.device for p in serial.tools.list_ports.comports()]
+    return puerto in disponibles
+
 
 # Formato real con estado dinámico (US vs ST)
 def generar_linea_formato_bascula(peso, estable):
@@ -50,6 +59,7 @@ def calcular_pasos(peso_ini, peso_fin):
 
 # Simulación en hilo
 def iniciar_simulacion():
+    ser = None
     try:
         ser = serial.Serial(puerto_simulado[0], velocidad)
         print(f"✅ Puerto {puerto_simulado[0]} abierto.")
@@ -68,13 +78,23 @@ def iniciar_simulacion():
             ser.write(linea.encode('utf-8'))
             time.sleep(intervalo_envio)
 
-        ser.close()
-        print("⛔ Puerto cerrado.")
     except Exception as e:
         print(f"❌ Error al abrir puerto {puerto_simulado[0]}: {e}")
+    finally:
+        if ser:
+            try:
+                if ser.is_open:
+                    ser.flush()       # vacía buffer de salida
+                    ser.close()
+                    print("⛔ Puerto cerrado.")
+            except Exception as cerrar_error:
+                print(f"⚠️ Error al cerrar el puerto: {cerrar_error}")
+            del ser  # libera el objeto Serial completamente
+            time.sleep(0.5)  # espera para asegurar liberación del sistema
+
 
 # Botón iniciar/detener
-def al_presionar_boton_simulacion():
+"""def al_presionar_boton_simulacion():
     if not simulando[0]:
         print(f"🔄 Intentando abrir {puerto_simulado[0]}...")
         simulando[0] = True
@@ -83,7 +103,31 @@ def al_presionar_boton_simulacion():
         boton_inicio.config(text="Detener Simulación")
     else:
         simulando[0] = False
+        boton_inicio.config(text="Iniciar Simulación")"""
+        
+def al_presionar_boton_simulacion():
+    if not simulando[0]:
+        print(f"🔄 Intentando abrir {puerto_simulado[0]}...")
+        simulando[0] = True
+
+        def correr():
+            try:
+                iniciar_simulacion()
+            except Exception as e:
+                simulando[0] = False
+                msg = f"❌ Error al abrir el puerto {puerto_simulado[0]}:\n{e}"
+                print(msg)
+                messagebox.showerror("Error de conexión", msg)
+                boton_inicio.config(text="Iniciar Simulación")
+
+        hilo_simulacion[0] = threading.Thread(target=correr, daemon=True)
+        hilo_simulacion[0].start()
+
+        boton_inicio.config(text="Detener Simulación")
+    else:
+        simulando[0] = False
         boton_inicio.config(text="Iniciar Simulación")
+
 
 # Cambiar peso destino
 def cambiar_peso(nuevo_peso):
@@ -104,29 +148,84 @@ def aplicar_peso_manual():
     except ValueError:
         print("⚠️ Ingresa un número entero válido y no negativo.")
 
-# COM disponibles
+"""# COM disponibles
 def obtener_puertos_disponibles():
-    return [p.device for p in serial.tools.list_ports.comports()]
+    return [p.device for p in serial.tools.list_ports.comports()]"""
 
-# Actualizar lista de COMs
+# COM disponibles (fijos del 1 al 20)
+def obtener_puertos_disponibles():
+    return [f'COM{i}' for i in range(1, 21)]
+
+#Actualizar lista de COM
+"""#Actualizar lista sin cambiar el COM seleccionado automáticamente
 def actualizar_lista_com():
     puertos = obtener_puertos_disponibles()
     combobox_com['values'] = puertos
-    if puertos:
-        if puerto_simulado[0] in puertos:
-            combobox_com.set(puerto_simulado[0])
+    combobox_com.set(puerto_simulado[0])
+    print(f">>> COM seleccionado (manual): {puerto_simulado[0]}")"""
+
+# Actualizar lista de COM mostrando primero los disponibles (marcados con ✅) en orden ascendente
+def actualizar_lista_com():
+    # Lista fija de COM1 a COM20
+    puertos_fijos = [f'COM{i}' for i in range(1, 21)]
+
+    # Detectar puertos realmente disponibles en el sistema (según PySerial)
+    disponibles = sorted([p.device for p in serial.tools.list_ports.comports()])
+
+    # Filtrar los disponibles que están dentro del rango COM1–COM20
+    disponibles_en_rango = [p for p in puertos_fijos if p in disponibles]
+
+    # Obtener los COMs del rango que no están disponibles actualmente
+    no_disponibles = [p for p in puertos_fijos if p not in disponibles]
+
+    # Agregar un marcador visual ✅ a los disponibles
+    disponibles_marcados = [f'✅ {p}' for p in disponibles_en_rango]
+
+    # Lista final con disponibles primero (con ✅), luego los no disponibles
+    lista_final = disponibles_marcados + no_disponibles
+
+    # Guardar la selección actual del usuario (sin el marcador ✅ si lo tiene)
+    seleccion_actual = combobox_com.get().replace("✅ ", "")
+
+    # Establecer la lista final como opciones del Combobox
+    combobox_com['values'] = lista_final
+
+    # Restaurar la selección actual si aún está en la lista de puertos
+    if seleccion_actual in puertos_fijos:
+        if seleccion_actual in disponibles_en_rango:
+            # Si el COM sigue estando disponible, mostrarlo con el marcador ✅
+            combobox_com.set(f'✅ {seleccion_actual}')
         else:
-            combobox_com.set(puertos[0])
-            puerto_simulado[0] = puertos[0]
-        print(f">>> COM seleccionado: {puerto_simulado[0]}")
-        guardar_com_actual()
+            # Si ya no está disponible, mostrarlo sin marcador
+            combobox_com.set(seleccion_actual)
+    else:
+        # Si no hay selección válida previa, dejar vacío el Combobox
+        combobox_com.set('')
+
 
 # Cambio de COM manual
-def seleccionar_puerto(event):
+"""def seleccionar_puerto(event):
     seleccion = combobox_com.get()
     puerto_simulado[0] = seleccion
     print(f">>> COM cambiado a: {seleccion}")
+    guardar_com_actual()"""
+    
+def seleccionar_puerto(event):
+    if simulando[0]:
+        simulando[0] = False
+        print("🛑 Deteniendo simulación por cambio de puerto...")
+        boton_inicio.config(text="Iniciar Simulación")
+
+        if hilo_simulacion[0] and hilo_simulacion[0].is_alive():
+            hilo_simulacion[0].join(timeout=3)
+            print("✅ Hilo de simulación detenido correctamente.")
+
+    seleccion = combobox_com.get().replace("✅ ", "")
+    puerto_simulado[0] = seleccion
+    print(f">>> COM cambiado a: {seleccion}")
     guardar_com_actual()
+
+
 
 # Interfaz gráfica
 root = tk.Tk()
