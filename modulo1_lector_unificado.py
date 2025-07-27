@@ -23,6 +23,15 @@ def ejecutar_modulo3():
 def proceso_activo(proceso):
     return proceso is not None and proceso.poll() is None and psutil.pid_exists(proceso.pid)
 
+#funcion para centrar la ventana
+def centrar_ventana(ventana, ancho, alto, margen_superior=200):
+    ventana.update_idletasks()
+    pantalla_ancho = ventana.winfo_screenwidth()
+    pantalla_alto = ventana.winfo_screenheight()
+    x = (pantalla_ancho - ancho) // 2
+    y = margen_superior
+    ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
+
 # Alerta por desconexión
 class VentanaDesconexion:
     def __init__(self, root):
@@ -35,20 +44,26 @@ class VentanaDesconexion:
             return
         self.activa = True
         self.ventana = tk.Toplevel(self.root)
+        self.ventana.withdraw()  # 👈 Oculta la ventana antes de mostrarla
         self.ventana.title("Desconexión de báscula")
-        self.ventana.geometry("300x170")
+        #self.ventana.geometry("300x170")
         self.ventana.resizable(False, False)
         self.ventana.attributes("-topmost", True)
         self.ventana.lift()
         self.ventana.focus_force()
         self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)
+        
+        # Centrar la ventana en la pantalla
+        centrar_ventana(self.ventana, 300, 170, margen_superior=200)  # Puedes ajustar el margen si quieres más arriba
 
+        # Crear contenido
         tk.Label(self.ventana, text="⚠️ Báscula desconectada.\nSeleccione la causa:", font=("Arial", 11)).pack(pady=10)
         tk.Button(self.ventana, text="Corte de energía", width=25,
                   command=lambda: self.cerrar("Corte de energía")).pack(pady=5)
         tk.Button(self.ventana, text="Desconexión de cable", width=25,
                   command=lambda: self.cerrar("Desconexión de cable")).pack(pady=5)
-
+        self.ventana.deiconify()  # 👈 Ahora sí mostrar centrada
+        
     def cerrar(self, motivo=None):
         if motivo:
             print(f"📝 Usuario indicó: {motivo}")
