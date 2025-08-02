@@ -1036,7 +1036,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=lambda: (frame_formulario.pack_forget(), cerrar_proceso_impresion(),
                                                                                      #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-                                                                                     centrar_ventana(722, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
+                                                                                     centrar_ventana(ventana, 722, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
                                                                                      )).pack(side="left", padx=10)
 
 
