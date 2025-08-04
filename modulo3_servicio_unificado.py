@@ -19,6 +19,7 @@ from estado_pesajes import pesajes_temporales, pesajes_confirmados
 import json
 import os #realizar operaciones sobre sistema operativo (comprueba archivo existe, elimina archivos, crea carpetas, accede path del sistema, etc.)
 
+from integracion_mysql import guardar_cliente_y_pesaje # importacion para la base de datos
 
 # Lista global para rastrear si hay ventanas de impresión abiertas
 ventanas_tiquete_abiertas = []
@@ -391,6 +392,22 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         peso = peso_capturado_global
 
 
+        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
+        """guardar_cliente_y_pesaje(
+            tipo_cliente="interna",
+            datos_cliente={
+                "nombre": empresa_sel,
+                "datos_adicionales": f"Remisión {remision}"
+            },
+            datos_pesaje={
+                "peso_bruto": peso,
+                "peso_tara": None,
+                "placa": placa
+            }
+        )"""
+        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+
+
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
         # Llama a función unificada que maneja apertura o cierre manual
         continuar_flujo_pesaje_interno(
@@ -443,6 +460,29 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             peso_inicial = estado[clave]["peso_entrada"]
             peso_neto = abs(peso_final - peso_inicial)
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+            peso_bruto = max(peso_inicial, peso_final)
+            peso_tara = min(peso_inicial, peso_final)
+
+            from integracion_mysql import guardar_cliente_y_pesaje
+            guardar_cliente_y_pesaje(
+                tipo_cliente="interna",
+                datos_cliente={
+                    "nombre": tipo,
+                    "datos_adicionales": f"Cierre automático de pesaje"
+                },
+                datos_pesaje={
+                    "peso_bruto": peso_bruto,
+                    "peso_tara": peso_tara,
+                    "peso_neto": peso_neto,
+                    "placa": id_ingresado.split(" ")[0]  # asume que la placa es la primera parte del ID
+                    
+                }
+            )
+            # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+            
+            
             # Actualizar y eliminar el pesaje
             estado[clave]["peso_salida"] = peso_final
             estado[clave]["fecha_hora_salida"] = fecha_actual
@@ -507,6 +547,24 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
     # 🟣 ASTILLABLE (solo imprime, no guarda)
     elif tipo == "Astillable":
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+        from integracion_mysql import guardar_cliente_y_pesaje
+        guardar_cliente_y_pesaje(
+            tipo_cliente="interna",
+            datos_cliente={
+                "nombre": "Astillable",
+                "datos_adicionales": "Pesaje sin cierre"
+            },
+            datos_pesaje={
+                "peso_bruto": peso,
+                "peso_tara": 0,
+                "placa": id_ingresado.split(" ")[0],  # ← Asume que la placa es la primera parte del ID
+                "peso_neto": peso  # neto = bruto si no hay tara
+            }
+        )
+        # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+        
         contenido = (
             f"Pesaje único registrado.\n"
             f"{tipo}:\n"
@@ -637,6 +695,24 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
         print(f"[DEBUG] peso_capturado_global al confirmar formulario igualando peso: {peso_capturado_global}")
 
 
+        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
+        """from integracion_mysql import guardar_cliente_y_pesaje
+        guardar_cliente_y_pesaje(
+            tipo_cliente="mensual",
+            datos_cliente={
+                "empresa": cliente_nombre,
+                "clave": remision if remision else placa  # usa remisión si hay, sino placa
+            },
+            datos_pesaje={
+                "peso_bruto": peso,
+                "peso_tara": None,
+                "placa": placa
+            }
+        )"""
+        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+
+
+
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
         # Llama a función unificada que maneja apertura o cierre manual
         continuar_flujo_pesaje_externo( 
@@ -699,6 +775,28 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         peso_final = peso_confirmado
         peso_neto = abs(peso_final - peso_inicial)
         fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+
+        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (pesajes con cierre)
+        peso_bruto = max(peso_inicial, peso_final)
+        peso_tara = min(peso_inicial, peso_final)
+
+        from integracion_mysql import guardar_cliente_y_pesaje
+        guardar_cliente_y_pesaje(
+            tipo_cliente="mensual",
+            datos_cliente={
+                "empresa": clave.split(":")[1],
+                "clave": clave.split(":")[2]
+            },
+            datos_pesaje={
+                "peso_bruto": peso_bruto,
+                "peso_tara": peso_tara,
+                "peso_neto": peso_neto,
+                "placa": clave.split(":")[2].split(" ")[0]
+            }
+        )
+        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+        
 
         del estado[clave]  # 🔁 Elimina el registro cerrado
 
@@ -749,6 +847,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             f"ID: {id_ingresado}\n"
             f"Peso Inicial: {peso:.2f} kg — {fecha_actual}"
         )
+                
         mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
 
     else:
@@ -759,6 +858,24 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             f"ID: {id_ingresado}\n"
             f"Peso: {peso:.2f} kg — {fecha_actual}"
         )
+                
+        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (solo pesajes sin cierre)
+        from integracion_mysql import guardar_cliente_y_pesaje
+        guardar_cliente_y_pesaje(
+            tipo_cliente="mensual",
+            datos_cliente={
+                "empresa": clave.split(":")[1],  # cliente_nombre
+                "clave": clave.split(":")[2]     # placa + remisión
+            },
+            datos_pesaje={
+                "peso_bruto": peso,
+                "peso_tara": None,
+                "peso_neto": peso, # si no hay tara, peso_neto = peso_bruto
+                "placa": clave.split(":")[2].split(" ")[0]  # solo la placa
+            }
+        )
+        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL    
+        
         mostrar_tiquete_con_impresion("Pesaje único", contenido)
 
     if refrescar_tabla_pesajes:
@@ -959,6 +1076,28 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             peso_neto = abs(peso_final - peso_ini)
             fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
+            # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (CIERRE AUTOMÁTICO)
+            from integracion_mysql import guardar_cliente_y_pesaje
+            peso_bruto = max(peso_ini, peso_final)
+            peso_tara = min(peso_ini, peso_final)
+            guardar_cliente_y_pesaje(
+                tipo_cliente="tercero",
+                datos_cliente={
+                    "nombre": razon,
+                    "cedula_nit": nit,
+                    "correo_remision": correo
+                },
+                datos_pesaje={
+                    "peso_bruto": peso_bruto,
+                    "peso_tara": peso_tara,
+                    "peso_neto": peso_neto,
+                    "placa": placa
+                }
+            )
+            # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+
+
             del estado[clave_existente]
             with open("estado_actual_pesajes.json", "w") as file:
                 json.dump(estado, file, indent=4)
@@ -1021,6 +1160,25 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"Peso registrado: {peso:.2f} kg\n"
                 f"Fecha: {fecha_actual}"
             )
+            
+            # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
+            from integracion_mysql import guardar_cliente_y_pesaje
+            guardar_cliente_y_pesaje(
+                tipo_cliente="tercero",
+                datos_cliente={
+                    "nombre": razon,
+                    "cedula_nit": nit,
+                    "correo_remision": correo
+                },
+                datos_pesaje={
+                    "peso_bruto": peso,
+                    "peso_tara": None,
+                    "peso_neto": peso,
+                    "placa": placa
+                }
+            )
+            # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+            
             mostrar_tiquete_con_impresion("Pesaje único (sin cierre)", contenido)
 
         if refrescar_tabla_pesajes:
@@ -1036,7 +1194,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=lambda: (frame_formulario.pack_forget(), cerrar_proceso_impresion(),
                                                                                      #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-                                                                                     centrar_ventana(722, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
+                                                                                     centrar_ventana(ventana, 722, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
                                                                                      )).pack(side="left", padx=10)
 
 
