@@ -32,8 +32,9 @@ cursor.execute('''
 CREATE TABLE IF NOT EXISTS cliente_tercero (
     id_cliente INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100),
-    cedula_nit VARCHAR(20),
-    correo_remision VARCHAR(100)
+    cedula_nit VARCHAR(50),
+    correo_remision VARCHAR(100),
+    id_ingresado VARCHAR(100) -- placa + espacio + empresa + número de remisión
 )
 ''')
 
@@ -41,8 +42,10 @@ CREATE TABLE IF NOT EXISTS cliente_tercero (
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS cliente_mensual (
     id_cliente INT AUTO_INCREMENT PRIMARY KEY,
-    empresa VARCHAR(100),
-    clave_placa_remision VARCHAR(50)
+    tipo varchar(100),        -- aqui 
+    nombre VARCHAR(100),       -- nombre de la empresa
+    nit VARCHAR(50),        -- NIT de la empresa
+    id_ingresado VARCHAR(100) -- placa + espacio + empresa + número de remisión
 )
 ''')
 
@@ -50,8 +53,11 @@ CREATE TABLE IF NOT EXISTS cliente_mensual (
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS cliente_interno (
     id_cliente INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(100),
-    datos_adicionales TEXT
+    tipo varchar(100),        -- aqui defino si es aserrio, inmuniza o astillable
+    codigo_empresa VARCHAR(5), -- 'RG' o 'MS' para identificar la empresa
+    nombre VARCHAR(100),       -- nombre de la empresa (p.ej. Reforestadora El Guásimo S.A.S)
+    nit VARCHAR(50),          -- NIT de la empresa
+    id_ingresado VARCHAR(100) -- placa + espacio + empresa + número de remisión
 )
 ''')
 
@@ -61,7 +67,8 @@ CREATE TABLE IF NOT EXISTS desconexiones (
     id_desconexion INT AUTO_INCREMENT PRIMARY KEY,
     fecha_hora DATETIME NOT NULL,
     tipo_desconexion VARCHAR(50),
-    descripcion TEXT
+    descripcion VARCHAR(100)
+    
 )
 ''')
 

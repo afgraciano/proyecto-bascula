@@ -379,33 +379,28 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
             entry_remision.focus_set()
             return
         
+        # Asignar nombre y NIT de la empresa
+        if empresa_sel == "RG":
+            nombre_empresa = "Reforestadora El Guásimo S.A.S"
+            nit_empresa = "8909408520"
+        else:
+            nombre_empresa = "MS Timberland Holdings Limited"
+            nit_empresa = "9004023313"
+
+        #clave_placa_remision = f"{placa} {empresa_sel} {remision}"
+        
         
         
         # 🔁 Construimos el ID y clave si todo esta bien
         id_ingresado = f"{placa} {empresa_sel}{remision}".strip().upper()
         clave = f"{tipo}:{id_ingresado}".strip()
-        #peso, _ = obtener_datos_peso()
+        
         
         #adquiero de la variable global el peso antes capturado
         global peso_capturado_global
         print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
         peso = peso_capturado_global
 
-
-        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
-        """guardar_cliente_y_pesaje(
-            tipo_cliente="interna",
-            datos_cliente={
-                "nombre": empresa_sel,
-                "datos_adicionales": f"Remisión {remision}"
-            },
-            datos_pesaje={
-                "peso_bruto": peso,
-                "peso_tara": None,
-                "placa": placa
-            }
-        )"""
-        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
 
 
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
@@ -417,7 +412,15 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
             peso=peso,
             ventana=ventana,
             refrescar_tabla_pesajes=refrescar_tabla_pesajes,
-            limpiar_formulario_unicamente=limpiar_formulario_unicamente
+            limpiar_formulario_unicamente=limpiar_formulario_unicamente,
+            #definimos los datos de la empresa que van a ir en mysql
+            datos_empresa={
+                "tipo": tipo,
+                "codigo_empresa": empresa_sel,
+                "nombre": nombre_empresa,
+                "nit": nit_empresa,
+                "id_ingresado": id_ingresado
+            }
         )
         
      
@@ -440,7 +443,7 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
 # 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.
-def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
   
     # Cargar archivo de estado
     archivo_estado = "estado_actual_pesajes.json"
@@ -467,17 +470,13 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 
             from integracion_mysql import guardar_cliente_y_pesaje
             guardar_cliente_y_pesaje(
-                tipo_cliente="interna",
-                datos_cliente={
-                    "nombre": tipo,
-                    "datos_adicionales": f"Cierre automático de pesaje"
-                },
+                tipo_cliente="interno",
+                datos_cliente=datos_empresa,
                 datos_pesaje={
                     "peso_bruto": peso_bruto,
                     "peso_tara": peso_tara,
                     "peso_neto": peso_neto,
-                    "placa": id_ingresado.split(" ")[0]  # asume que la placa es la primera parte del ID
-                    
+                    "placa": id_ingresado.split(" ")[0]# ← Asume que la placa es la primera parte del ID
                 }
             )
             # 🔼 FIN BLOQUE GUARDADO EN MYSQL
@@ -491,7 +490,9 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             with open(archivo_estado, "w") as file:
                 json.dump(estado, file, indent=4)
 
+            encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
             contenido = (
+                f"{encabezado}"
                 f"Pesaje final registrado.\n"
                 f"{tipo}:\n"
                 f"ID: {id_ingresado}\n"
@@ -531,8 +532,10 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
-
+            
+        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
+            f"{encabezado}"
             f"Pesaje inicial registrado.\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
@@ -551,21 +554,21 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
         from integracion_mysql import guardar_cliente_y_pesaje
         guardar_cliente_y_pesaje(
-            tipo_cliente="interna",
-            datos_cliente={
-                "nombre": "Astillable",
-                "datos_adicionales": "Pesaje sin cierre"
-            },
+            tipo_cliente="interno",
+            
+            datos_cliente=datos_empresa,
             datos_pesaje={
                 "peso_bruto": peso,
                 "peso_tara": 0,
-                "placa": id_ingresado.split(" ")[0],  # ← Asume que la placa es la primera parte del ID
-                "peso_neto": peso  # neto = bruto si no hay tara
+                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                "peso_neto": peso # neto = bruto si no hay tara
             }
         )
         # 🔼 FIN BLOQUE GUARDADO EN MYSQL
         
+        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
+            f"{encabezado}"
             f"Pesaje único registrado.\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
@@ -593,7 +596,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 # Se genera un tiquete al finalizar, y el estado se guarda o actualiza en el JSON.
 # --------------------------------------------------------------------
 
-# 🔁 Función que crea y muestra el formulario visual estándar para Externos (cipreses de colombia, nucleos de colombia, construinmuniza )
+# 🔁 Función que crea y muestra el formulario visual estándar para Externos (Cipreses de Colombia, Núcleos de Madera, Construinmuniza )
 def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame_formulario, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
     
     #ventana.geometry("722x668")  # 👈 abre la ventana principal servicio bascula al abrir el formulario
@@ -606,6 +609,22 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
     for widget in frame_formulario.winfo_children():
         widget.destroy()
     
+    
+    # ASIGNACIÓN DE NOMBRE Y NIT
+    # Se determina qué empresa mensual fue seleccionada (cliente_nombre)
+    # y se asigna el NIT correspondiente.
+    
+    if cliente_nombre == "Cipreses de Colombia":
+        nombre = cliente_nombre
+        nit = "890903541"
+    elif cliente_nombre == "Núcleos de Madera":
+        # _norm() quita acentos, así que "núcleos" y "nucleos" dan igual
+        nombre = cliente_nombre
+        nit = "811016049"
+    elif cliente_nombre == "Construinmuniza":
+        nombre = cliente_nombre
+        nit = "900297110"
+  
     
     # Título del formulario
     tk.Label(frame_formulario, text=f"{cliente_nombre} — Formulario de Pesaje", font=("Arial", 12, "bold")).pack(pady=(0, 10))
@@ -695,24 +714,6 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
         print(f"[DEBUG] peso_capturado_global al confirmar formulario igualando peso: {peso_capturado_global}")
 
 
-        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
-        """from integracion_mysql import guardar_cliente_y_pesaje
-        guardar_cliente_y_pesaje(
-            tipo_cliente="mensual",
-            datos_cliente={
-                "empresa": cliente_nombre,
-                "clave": remision if remision else placa  # usa remisión si hay, sino placa
-            },
-            datos_pesaje={
-                "peso_bruto": peso,
-                "peso_tara": None,
-                "placa": placa
-            }
-        )"""
-        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
-
-
-
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
         # Llama a función unificada que maneja apertura o cierre manual
         continuar_flujo_pesaje_externo( 
@@ -723,9 +724,16 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
             peso=peso,
             ventana=ventana,
             refrescar_tabla_pesajes=refrescar_tabla_pesajes,
-            limpiar_formulario_unicamente=limpiar_formulario_unicamente)
+            limpiar_formulario_unicamente=limpiar_formulario_unicamente,
+            #definimos los datos de la empresa que van a ir en mysql
+            datos_empresa={
+                "tipo": tipo,
+                "nombre": nombre,
+                "nit": nit,
+                "id_ingresado": id_ingresado
+            }
+            )
    
-
             
             
     # 🔴 Función para boton cancelar del formulario
@@ -747,7 +755,7 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
 # 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.   
-def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
+def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
     archivo_estado = "estado_actual_pesajes.json"
 
     try:
@@ -784,28 +792,26 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         from integracion_mysql import guardar_cliente_y_pesaje
         guardar_cliente_y_pesaje(
             tipo_cliente="mensual",
-            datos_cliente={
-                "empresa": clave.split(":")[1],
-                "clave": clave.split(":")[2]
-            },
+            datos_cliente=datos_empresa,
             datos_pesaje={
                 "peso_bruto": peso_bruto,
                 "peso_tara": peso_tara,
                 "peso_neto": peso_neto,
-                "placa": clave.split(":")[2].split(" ")[0]
+                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
             }
         )
         # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
-        
+               
 
-        del estado[clave]  # 🔁 Elimina el registro cerrado
+        del estado[clave]  # 🔁 Elimina el registro cerrado del json
 
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
 
         actualizar_estado_pesajes()
-
+        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
+            f"{encabezado}"
             f"Pesaje cerrado:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
@@ -840,8 +846,9 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             json.dump(estado, file, indent=4)
 
         actualizar_estado_pesajes()
-
+        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
+            f"{encabezado}"
             f"Pesaje inicial registrado:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
@@ -852,7 +859,9 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
 
     else:
         # PESAJE ÚNICO (sin cierre posterior)
+        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
+            f"{encabezado}"
             f"Pesaje registrado sin cierre:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
@@ -863,15 +872,12 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         from integracion_mysql import guardar_cliente_y_pesaje
         guardar_cliente_y_pesaje(
             tipo_cliente="mensual",
-            datos_cliente={
-                "empresa": clave.split(":")[1],  # cliente_nombre
-                "clave": clave.split(":")[2]     # placa + remisión
-            },
+            datos_cliente=datos_empresa,
             datos_pesaje={
                 "peso_bruto": peso,
                 "peso_tara": None,
                 "peso_neto": peso, # si no hay tara, peso_neto = peso_bruto
-                "placa": clave.split(":")[2].split(" ")[0]  # solo la placa
+                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
             }
         )
         # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL    
@@ -1033,11 +1039,11 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             entry_correo.focus_set()
             return
 
-        id_final = f"{placa} {remision}".strip()
+        id_ingresado = f"{placa} {remision}".strip()
         # 🔑 Clave completa usada para identificar pesajes únicos
         # Incluye: tipo, cliente, placa, remisión (opcional), razón social y NIT
         # Esto garantiza que no se confundan pesajes con la misma placa pero diferente empresa o persona
-        clave = f"{tipo}:{cliente_nombre}:{id_final}:{razon}:{nit}".strip()
+        clave = f"{tipo}:{cliente_nombre}:{id_ingresado}:{razon}:{nit}".strip()
        
 
         global peso_capturado_global
@@ -1054,7 +1060,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
         # 🔍 Buscar si ya existe un pesaje con misma placa, remisión, razon y nit
         clave_existente = None
         for k, v in estado.items():
-            if k.startswith(f"{tipo}:{cliente_nombre}:{id_final}") and v.get("razon") == razon and v.get("nit") == nit:
+            if k.startswith(f"{tipo}:{cliente_nombre}:{id_ingresado}") and v.get("razon") == razon and v.get("nit") == nit:
                 clave_existente = k
                 break
                 
@@ -1086,7 +1092,8 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 datos_cliente={
                     "nombre": razon,
                     "cedula_nit": nit,
-                    "correo_remision": correo
+                    "correo_remision": correo,
+                    "id_ingresado": id_ingresado
                 },
                 datos_pesaje={
                     "peso_bruto": peso_bruto,
@@ -1109,7 +1116,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"Cliente: {razon}\n"
                 f"NIT: {nit}\n"
                 f"Correo: {correo}\n"
-                f"ID: {id_final}\n"
+                f"ID: {id_ingresado}\n"
                 f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
                 f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
                 f"Peso Neto: {peso_neto:.2f} kg"
@@ -1128,7 +1135,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             estado[clave] = {
                 "tipo": tipo,
-                "id": id_final,
+                "id": id_ingresado,
                 "peso_entrada": peso,
                 "fecha_hora_entrada": fecha_actual,
                 "razon": razon,
@@ -1144,7 +1151,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"Cliente: {razon}\n"
                 f"NIT: {nit}\n"
                 f"Correo: {correo}\n"
-                f"ID: {id_final}\n"
+                f"ID: {id_ingresado}\n"
                 f"Peso inicial registrado: {peso:.2f} kg\n"
                 f"Fecha: {fecha_actual}"
             )
@@ -1156,7 +1163,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"Cliente: {razon}\n"
                 f"NIT: {nit}\n"
                 f"Correo: {correo}\n"
-                f"ID: {id_final}\n"
+                f"ID: {id_ingresado}\n"
                 f"Peso registrado: {peso:.2f} kg\n"
                 f"Fecha: {fecha_actual}"
             )
@@ -1168,7 +1175,8 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 datos_cliente={
                     "nombre": razon,
                     "cedula_nit": nit,
-                    "correo_remision": correo
+                    "correo_remision": correo,
+                    "id_ingresado": id_ingresado
                 },
                 datos_pesaje={
                     "peso_bruto": peso,
