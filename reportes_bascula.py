@@ -6,6 +6,7 @@ from datetime import datetime  # Para manejar fechas
 import mysql.connector  # Conexión a MySQL
 import pandas as pd  # Manipulación de datos y exportación a Excel
 import os  # Operaciones con archivos
+import tkinter.font as tkFont #para autoajustar las columnas
 
 # Importa pyodbc si está disponible, para exportar a Access
 try:
@@ -62,14 +63,38 @@ class ReportesBasculaApp:
         # Botón de consulta
         ttk.Button(filtro_frame, text="Consultar", command=self.consultar).grid(row=1, column=6, padx=10)
 
-        # === Tabla para mostrar resultados ===
-        self.tree = ttk.Treeview(root)
-        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+        # === Tabla para mostrar resultados (Treeview + Scrollbars) ===
+        tree_frame = ttk.Frame(root)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Scrollbars
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical")
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
+
+        # Treeview con scrollbars
+        self.tree = ttk.Treeview(
+            tree_frame,
+            show="headings",
+            yscrollcommand=vsb.set,
+            xscrollcommand=hsb.set
+        )
+        self.tree.grid(row=0, column=0, sticky="nsew")
+
+        # Configuración de scrollbars
+        vsb.config(command=self.tree.yview)
+        hsb.config(command=self.tree.xview)
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+
+        # Ajustar expansión del Treeview dentro del frame
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
         # === Botones de exportación de resultados===
         btn_frame = ttk.Frame(root)
         btn_frame.pack(pady=5)
-
+        
+        
         ttk.Button(btn_frame, text="Exportar a Excel", command=self.exportar_excel).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Exportar a Access", command=self.exportar_access).pack(side="left", padx=5)
         ttk.Button(btn_frame, text="Exportar a PDF", command=self.exportar_pdf).pack(side="left", padx=5)
@@ -217,6 +242,7 @@ class ReportesBasculaApp:
 
 
         # Mostrar resultados en la tabla
+        # Limpiar Treeview
         self.tree.delete(*self.tree.get_children())
 
         if resultados:
@@ -243,6 +269,17 @@ class ReportesBasculaApp:
 
             for row in datos_modificados:
                 self.tree.insert("", "end", values=list(row.values()))
+
+            # === Ajustar ancho de columnas automáticamente ===
+            import tkinter.font as tkFont
+            for col in columnas:
+                ancho_max = tkFont.Font().measure(col)
+                for item in self.tree.get_children():
+                    texto = str(self.tree.set(item, col))
+                    ancho = tkFont.Font().measure(texto)
+                    if ancho > ancho_max:
+                        ancho_max = ancho
+                self.tree.column(col, width=ancho_max + 10)  # +10 para margen
 
             self.datos_actuales = resultados  # aquí guardamos el original sin modificaciones para uso interno
 
