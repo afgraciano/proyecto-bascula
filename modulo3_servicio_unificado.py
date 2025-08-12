@@ -24,8 +24,14 @@ from integracion_mysql import guardar_cliente_y_pesaje # importacion para la bas
 # Lista global para rastrear si hay ventanas de impresión abiertas
 ventanas_tiquete_abiertas = []
 
+# Encabezado único para impresión y preview
+ENCABEZADO_TIQUETE = (
+    "Reforestadora El Guásimo S.A.S\n"
+    "con NIT: 890940852-0\n"
+    "Presta servicio de bascula a:\n\n"
+)
 
-#defino funcion para imprimir tiquete
+#defino funcion para imprimir tiquete tamaño adaptable
 def imprimir_tiquete(texto, impresora=None):
     if impresora is None:
         impresora = win32print.GetDefaultPrinter()
@@ -39,11 +45,11 @@ def imprimir_tiquete(texto, impresora=None):
         dpi = hdc.GetDeviceCaps(88)  # LOGPIXELSX 	Píxeles por pulgada horizontal (DPI) 88 es el codigo
         width_px = hdc.GetDeviceCaps(110)  # HORZRES 	Ancho imprimible en píxeles 110 es el codigo
         height_px = hdc.GetDeviceCaps(111)  # VERTRES 	Alto imprimible en píxeles 111 es el codigo
-
+        
         # Calcular tamaño de fuente ideal en función del ancho del papel
         chars_per_line = max(len(line) for line in texto.split("\n"))
         font_size = max(24, int(width_px / (chars_per_line + 2)))  # tamaño relativo al ancho disponible
-
+        
         hdc.StartDoc("Tiquete Báscula")
         hdc.StartPage()
 
@@ -56,6 +62,34 @@ def imprimir_tiquete(texto, impresora=None):
 
         y = 50
         line_spacing = int(font_size * 1.5)
+        
+                
+        #aqui comienza titulo de la impresion
+        # --- Fuente para el título ---
+        fuente_titulo = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size + 8,  # más grande que el texto normal
+            "weight": 900             # negrita fuerte
+        })
+        hdc.SelectObject(fuente_titulo)
+
+        # --- Agregar título fijo arriba de la impresion desde variable global---
+        for linea_titulo in ENCABEZADO_TIQUETE.strip().split("\n"):
+                    hdc.TextOut(50, y, linea_titulo)
+                    y += line_spacing
+
+        y += line_spacing  # espacio extra antes del contenido
+
+        # --- Volver a fuente normal ---
+        fuente_normal = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size,
+            "weight": 700
+        })
+        hdc.SelectObject(fuente_normal)
+        # aqui termina el titulo de la impresion
+        
+        
         for linea in texto.split("\n"):
             hdc.TextOut(50, y, linea)
             y += line_spacing
@@ -67,7 +101,66 @@ def imprimir_tiquete(texto, impresora=None):
         win32print.ClosePrinter(hprinter)
 
 
-#defino funcion para mostrar tiquete con impresion para que salga el mensaje a imprimir
+"""
+#defino funcion para imprimir tiquete adaptada a Epson TM-U220D
+def imprimir_tiquete(texto, impresora=None):
+    if impresora is None:
+        impresora = win32print.GetDefaultPrinter()
+
+    hprinter = win32print.OpenPrinter(impresora)
+    try:
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(impresora)
+
+        # 📏 Tamaños fijos optimizados para Epson TM-U220D
+        font_size_normal = 22   # Texto normal
+        font_size_titulo = 28   # Encabezado
+
+        hdc.StartDoc("Tiquete Báscula")
+        hdc.StartPage()
+
+        # --- Fuente para el título ---
+        fuente_titulo = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size_titulo,
+            "weight": 900  # Negrita fuerte
+        })
+        hdc.SelectObject(fuente_titulo)
+
+        y = 50
+        line_spacing = int(font_size_titulo * 1.5)
+
+        # --- Agregar título fijo arriba desde variable global ---
+        for linea_titulo in ENCABEZADO_TIQUETE.strip().split("\n"):
+            hdc.TextOut(50, y, linea_titulo)
+            y += line_spacing
+
+        y += line_spacing  # espacio extra antes del contenido
+
+        # --- Fuente normal para el contenido ---
+        fuente_normal = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size_normal,
+            "weight": 700
+        })
+        hdc.SelectObject(fuente_normal)
+
+        line_spacing = int(font_size_normal * 1.5)
+        for linea in texto.split("\n"):
+            hdc.TextOut(50, y, linea)
+            y += line_spacing
+
+        hdc.EndPage()
+        hdc.EndDoc()
+        hdc.DeleteDC()
+
+    finally:
+        win32print.ClosePrinter(hprinter)
+
+"""
+
+
+#defino funcion para mostrar tiquete con impresion para que salga el mensaje a imprimir adaptable
 def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana = tk.Toplevel()
     ventana.title(titulo)
@@ -78,21 +171,24 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     
     # Registrar la ventana activa en la lista global
     ventanas_tiquete_abiertas.append(ventana)
-
-    
     
     # Cuerpo del tiquete
     # Área de texto con el contenido del tiquete
     text_area = tk.Text(ventana, wrap="word", font=("Consolas", 10))
     text_area.pack(expand=True, fill="both", padx=10, pady=10)
-    text_area.insert("1.0", contenido)
+    
+    # ✅ Insertar el encabezado global antes del contenido
+    texto_completo = ENCABEZADO_TIQUETE + contenido
+    text_area.insert("1.0", texto_completo)
+    
+    
     text_area.config(state="disabled")
 
     frame_botones = tk.Frame(ventana)
     frame_botones.pack(pady=10)
 
     def imprimir_default():
-        imprimir_tiquete(contenido)
+        imprimir_tiquete(contenido)# ⚠ Aquí podrías usar texto_completo si quieres que incluya el encabezado siempre
 
     def seleccionar_e_imprimir():
         sub = tk.Toplevel()
@@ -115,7 +211,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
         def imprimir_seleccionada():
             impresora = seleccion.get()
             if impresora:
-                imprimir_tiquete(contenido, impresora)
+                imprimir_tiquete(contenido, impresora) # ⚠ Igual que arriba, podrías usar texto_completo
             sub.destroy()
 
         tk.Button(sub, text="🖨 Imprimir", command=imprimir_seleccionada).pack(pady=10)
@@ -136,6 +232,78 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
 
 
+"""
+#defino funcion para mostrar tiquete con impresion para que salga el mensaje a imprimir como saldria en la epson
+def mostrar_tiquete_con_impresion(titulo, contenido):
+    ventana = tk.Toplevel()
+    ventana.title(titulo)
+    centrar_ventana(ventana, 410, 500, margen_superior=50)  
+    ventana.resizable(False, False)
+    ventana.attributes("-topmost", True)
+
+    # Registrar la ventana activa
+    ventanas_tiquete_abiertas.append(ventana)
+
+    # 📏 Tamaños optimizados como la impresora Epson TM-U220D
+    font_size_titulo_preview = 12  # Aproximadamente similar a 28 en impresión
+    font_size_normal_preview = 10  # Aproximadamente similar a 22 en impresión
+
+    # Área de texto
+    text_area = tk.Text(ventana, wrap="word", font=("Consolas", font_size_normal_preview))
+    text_area.pack(expand=True, fill="both", padx=10, pady=10)
+
+    # Encabezado
+    text_area.insert("1.0", ENCABEZADO_TIQUETE)
+    text_area.tag_add("titulo", "1.0", "4.0")
+    text_area.tag_config("titulo", font=("Consolas", font_size_titulo_preview, "bold"))
+
+    # Contenido debajo del encabezado
+    text_area.insert("end", contenido)
+    text_area.config(state="disabled")
+
+    frame_botones = tk.Frame(ventana)
+    frame_botones.pack(pady=10)
+
+    def imprimir_default():
+        imprimir_tiquete(contenido)  # Usa la función adaptada de impresión
+
+    def seleccionar_e_imprimir():
+        sub = tk.Toplevel()
+        sub.title("Seleccionar impresora")
+        sub.geometry("400x150")
+        sub.resizable(False, False)
+        sub.attributes("-topmost", True)
+
+        tk.Label(sub, text="Seleccione una impresora instalada:", font=("Arial", 11)).pack(pady=10)
+        impresoras = win32print.EnumPrinters(2)
+        nombres = [p[2] for p in impresoras]
+        seleccion = tk.StringVar(value=nombres[0] if nombres else "")
+        lista = tk.OptionMenu(sub, seleccion, *nombres)
+        lista.config(width=40)
+        lista.pack(pady=5)
+
+        def imprimir_seleccionada():
+            impresora = seleccion.get()
+            if impresora:
+                imprimir_tiquete(contenido, impresora)
+            sub.destroy()
+
+        tk.Button(sub, text="🖨 Imprimir", command=imprimir_seleccionada).pack(pady=10)
+
+    def cerrar_ventana():
+        if ventana in ventanas_tiquete_abiertas:
+            ventanas_tiquete_abiertas.remove(ventana)
+        if not ventanas_tiquete_abiertas:
+            cerrar_proceso_impresion()
+        ventana.destroy()
+
+    # Botones
+    tk.Button(frame_botones, text="🖨 Imprimir (predeterminada)", command=imprimir_default).pack(side="left", padx=5)
+    tk.Button(frame_botones, text="🖨 Seleccionar impresora...", command=seleccionar_e_imprimir).pack(side="left", padx=5)
+    tk.Button(frame_botones, text="❌ Cerrar", command=cerrar_ventana).pack(side="left", padx=5)
+
+    ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
+"""
 
 #definio funcion para actualizar el estado del pesaje que se comparte con el modulo 1 y lo indico cada que agrego o elimino pesaje en pesajes_temporales
 # 🔄 Guardar estado actual de pesajes en archivo JSON
@@ -194,7 +362,7 @@ def obtener_datos_peso():
 peso_capturado_global = None
 
     
-# Función para confirmar o permitir ingreso manual si el peso es bajo
+# Función para confirmar o permitir ingreso manual si el peso es cero
 def confirmar_o_pedir_peso(peso, ventana):
     if peso <= 10:
         decision = messagebox.askyesno(
@@ -1339,7 +1507,7 @@ def modulo_servicio():
 
 
     # 🧾 Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha)
-    tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
+    """tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
 
     tree = ttk.Treeview(ventana, columns=("clave", "peso", "fecha"), show="headings", height=8)
     tree.heading("clave", text="Clave")
@@ -1348,7 +1516,47 @@ def modulo_servicio():
     tree.column("clave", width=300)
     tree.column("peso", anchor="center")
     tree.column("fecha", anchor="center")
-    tree.pack(expand=True, fill="both", padx=10, pady=5)
+    tree.pack(expand=True, fill="both", padx=10, pady=5)"""
+    
+    # 🧾 Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha) con scroll bar
+    tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
+
+    # Frame para tabla y scrollbars
+    frame_pesajes = ttk.Frame(ventana)
+    frame_pesajes.pack(expand=True, fill="both", padx=10, pady=5)
+
+    # Scrollbars
+    scroll_y = ttk.Scrollbar(frame_pesajes, orient="vertical")
+    scroll_x = ttk.Scrollbar(frame_pesajes, orient="horizontal")
+
+    tree = ttk.Treeview(
+        frame_pesajes,
+        columns=("clave", "peso", "fecha"),
+        show="headings",
+        height=7, #altura cuadro pesajes
+        yscrollcommand=scroll_y.set,
+        xscrollcommand=scroll_x.set
+    )
+    tree.heading("clave", text="Clave")
+    tree.heading("peso", text="Peso Inicial")
+    tree.heading("fecha", text="Fecha")
+    tree.column("clave", width=300)
+    tree.column("peso", anchor="center")
+    tree.column("fecha", anchor="center")
+
+    # Colocar elementos
+    tree.grid(row=0, column=0, sticky="nsew")
+    scroll_y.grid(row=0, column=1, sticky="ns")
+    scroll_x.grid(row=1, column=0, sticky="ew")
+
+    # Configurar scrollbars
+    scroll_y.config(command=tree.yview)
+    scroll_x.config(command=tree.xview)
+
+    # Expandir el Treeview dentro del frame
+    frame_pesajes.grid_rowconfigure(0, weight=1)
+    frame_pesajes.grid_columnconfigure(0, weight=1)
+
 
     # 🔁 Función para cargar y refrescar la tabla desde el JSON en tiempo real
     def refrescar_tabla_pesajes():
