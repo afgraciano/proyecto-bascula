@@ -13,6 +13,8 @@ import config
 import psutil  # ✅ Para verificar si el proceso aún está vivo
 from estado_pesajes import pesajes_temporales
 import json # Para leer archivo de estado
+from integracion_mysql import guardar_evento_desconexion  # 👈 Asegúrate de importar esto para la base de datos
+
 
 # Ejecuta módulo 3
 def ejecutar_modulo3():
@@ -67,6 +69,8 @@ class VentanaDesconexion:
     def cerrar(self, motivo=None):
         if motivo:
             print(f"📝 Usuario indicó: {motivo}")
+            guardar_evento_desconexion(motivo)  # 👈 Aquí se guarda el evento en la base de datos
+            
         if self.ventana and self.ventana.winfo_exists():
             self.ventana.destroy()
         self.activa = False
