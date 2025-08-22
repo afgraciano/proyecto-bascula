@@ -17,4 +17,5 @@ pip install mysql-connector-python
 pip install tabulate
 pip install pandas openpyxl fpdf pyodbc
 pip install tkcalendar
+pip install pyinstaller
 
