@@ -1,4 +1,3 @@
-
 # === Importación de módulos necesarios ===
 import tkinter as tk  # Para la interfaz gráfica
 from tkinter import ttk, messagebox, filedialog  # Widgets y mensajes de Tkinter
@@ -7,7 +6,10 @@ from datetime import timedelta #para tomar reportes del ultimo dia
 from tkcalendar import Calendar #para usar calendario
 import mysql.connector  # Conexión a MySQL
 import pandas as pd  # Manipulación de datos y exportación a Excel
-import os  # Operaciones con archivos
+import os  # Operaciones con archivos y deteccion de ejecutables
+import tkinter.font as tkFont #para autoajustar las columnas
+import subprocess #importo subprocesos para realizar copias de seguridad de Mysql
+
 
 # Importa pyodbc si está disponible, para exportar a Access
 try:
@@ -134,9 +136,32 @@ class ReportesBasculaApp:
         # Botón de consulta
         ttk.Button(filtro_frame, text="Consultar", command=self.consultar).grid(row=1, column=5, padx=5, pady=5, sticky="ew")
 
-        # === Tabla para mostrar resultados ===
-        self.tree = ttk.Treeview(root)
-        self.tree.pack(fill="both", expand=True, padx=10, pady=10)
+        # === Tabla para mostrar resultados con scroll (Treeview + Scrollbars) ===
+        tree_frame = ttk.Frame(root)
+        tree_frame.pack(fill="both", expand=True, padx=10, pady=10)
+
+        # Scrollbars
+        vsb = ttk.Scrollbar(tree_frame, orient="vertical")
+        hsb = ttk.Scrollbar(tree_frame, orient="horizontal")
+
+        # Treeview con scrollbars
+        self.tree = ttk.Treeview(
+            tree_frame,
+            show="headings",
+            yscrollcommand=vsb.set,
+            xscrollcommand=hsb.set
+        )
+        self.tree.grid(row=0, column=0, sticky="nsew")
+
+        # Configuración de scrollbars
+        vsb.config(command=self.tree.yview)
+        hsb.config(command=self.tree.xview)
+        vsb.grid(row=0, column=1, sticky="ns")
+        hsb.grid(row=1, column=0, sticky="ew")
+
+        # Ajustar expansión del Treeview dentro del frame
+        tree_frame.grid_rowconfigure(0, weight=1)
+        tree_frame.grid_columnconfigure(0, weight=1)
 
         # === Botones de exportación de resultados===
         #btn_frame = ttk.Frame(root)
@@ -150,11 +175,32 @@ class ReportesBasculaApp:
         
         # === Botones de exportación y respaldo ===
         btn_frame = ttk.Frame(root)
-        btn_frame.pack(pady=5)
+        btn_frame.pack(fill="x", pady=5)  # aquí solo colocamos el frame con pack
 
-        ttk.Button(btn_frame, text="Exportar a Excel", command=self.exportar_excel).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Exportar a Access", command=self.exportar_access).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="Exportar a PDF", command=self.exportar_pdf).pack(side="left", padx=5)
+        # Exportar
+        ttk.Button(btn_frame, text="Exportar a Excel", command=self.exportar_excel).grid(row=0, column=0, padx=5, pady=5)
+        ttk.Button(btn_frame, text="Exportar a Access", command=self.exportar_access).grid(row=0, column=1, padx=5, pady=5)
+        ttk.Button(btn_frame, text="Exportar a PDF", command=self.exportar_pdf).grid(row=0, column=2, padx=5, pady=5)
+
+        # Espacio vacío para empujar los de respaldo
+        btn_frame.grid_columnconfigure(3, weight=1)
+        
+        # Botones de copia de seguridad y restauracion
+        
+
+        #ttk.Button(btn_frame, text="Copia de seguridad", command=self.backup_base_datos).pack(side="right", padx=5)
+        #ttk.Button(btn_frame, text="Restaurar Copia Seguridad", command=self.restaurar_base_datos).pack(side="right", padx=5)
+        
+        # Botón copia de seguridad (misma columna que Consultar, fila siguiente)
+        ttk.Button(btn_frame, text="Copia de seguridad", command=self.backup_base_datos).grid(row=0, column=3, padx=5, pady=5)
+
+        # Botón restaurar copia (misma columna que Consultar, fila siguiente)
+        ttk.Button(btn_frame, text="Restaurar Copia Seguridad", command=self.restaurar_base_datos).grid(row=0, column=5, padx=5, pady=5, sticky="ew")
+
+
+        #ttk.Button(btn_frame, text="Copia de seguridad", command=self.backup_base_datos).grid(row=0, column=5, padx=5)
+        #ttk.Button(btn_frame, text="Restaurar Copia Seguridad", command=self.restaurar_base_datos).grid(row=0, column=6, padx=5)
+
 
         self.datos_actuales = []  # Aquí se guardan los datos cargados
 
@@ -335,6 +381,8 @@ class ReportesBasculaApp:
             for row in datos_modificados:
                 self.tree.insert("", "end", values=list(row.values()))
 
+            # === Ajustar ancho de columnas automáticamente ===
+            self.autoajustar_columnas()
             self.datos_actuales = resultados  # aquí guardamos el original sin modificaciones para uso interno
 
         else:
