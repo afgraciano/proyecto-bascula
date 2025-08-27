@@ -2,14 +2,25 @@
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import sys
 import os
+from datetime import datetime
 
 # Guarda la configuración del puerto COM en el archivo config.py
 def guardar_puerto_config(puerto):
-    ruta_config = os.path.join(os.path.dirname(__file__), 'config.py')
+    # Detectar carpeta real del ejecutable o del script
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(__file__)
+
+    ruta_config = os.path.join(base_dir, 'config.py')
+    #ruta_config = os.path.join(os.path.dirname(__file__), 'config.py')
     try:
         with open(ruta_config, 'w') as f:
             f.write(f'PUERTO_CONFIGURADO = "{puerto}"\n')
+            f.write(f'FECHA_CONFIGURACION = "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"\n')
+            
         return True
     except Exception as e:
         print(f"Error al guardar configuración: {e}")

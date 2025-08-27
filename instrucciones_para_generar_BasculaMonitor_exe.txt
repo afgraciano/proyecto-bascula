@@ -1,0 +1,30 @@
+📌 Instrucciones paso a paso para generar el ejecutable BasculaMonitor.exe usando Bat To Exe Portable:
+
+1. Descarga Bat To Exe Portable desde la página oficial de GitHub:
+   👉 https://github.com/Makazzz/BatToExePortable
+
+   - En la parte derecha busca la sección "Releases".
+   - Haz clic en la última versión disponible: **3.2 Dev Test 1 (latest)**.
+   - Descarga el archivo `.zip` (recomendado) o el `.exe`.
+
+2. Extrae el archivo ZIP descargado en una carpeta de tu preferencia
+   (por ejemplo: C:\Herramientas\BatToExePortable).
+
+3. Dentro de la carpeta, ejecuta `Bat_To_Exe_Converter.exe`.
+
+4. Una vez abierto el programa:
+   - En la parte superior izquierda, haz clic en el botón **Abrir**.
+   - Selecciona tu archivo **BasculaMonitor.bat** o **BasculaServicio.bat** (según el que quieras convertir).
+
+5. Configuración de opciones (lado derecho del programa):
+   - En "Formato de EXE", selecciona:
+     - ✅ **Ventana (invisible)** → para que NO aparezca la ventana negra de CMD.
+   - En "Icono", haz clic en **Examinar** y selecciona el icono que desees (por ejemplo el de Python o cualquier `.ico` que tengas).
+   - Opcional: marca "Información de versión" si deseas poner detalles del programa.
+
+6. En la parte superior, elige el nombre del ejecutable final (ejemplo: `BasculaMonitor.exe`) y la carpeta de salida.
+
+7. Finalmente, haz clic en **Convertir**.
+
+8. Listo 🚀 Ahora tendrás un archivo **BasculaMonitor.exe** que ejecutará tu script BAT sin mostrar la consola negra.
+
