@@ -682,17 +682,19 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             with open(archivo_estado, "w") as file:
                 json.dump(estado, file, indent=4)
 
-            encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+            encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
             contenido = (
                 f"{encabezado}"
                 f"Pesaje final registrado.\n"
                 f"{tipo}:\n"
                 f"ID: {id_ingresado}\n"
-                f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
-                f"Peso Final: {peso_final:.2f} kg — {fecha_actual}\n"
+                f"Peso Inicial: {peso_inicial:.2f} kg\n"
+                f"Fecha Inicial: {fecha_inicial}\n"
+                f"Peso Final: {peso_final:.2f} kg\n"
+                f"Fecha Final: {fecha_actual}\n"
                 f"Peso Neto: {peso_neto:.2f} kg"
             )
-            mostrar_tiquete_con_impresion("Resultado", contenido)
+            mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
             
             #cerrar_proceso_impresion()
             actualizar_estado_pesajes() # ✅ actualiza JSON en memoria
@@ -725,13 +727,14 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
             
-        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
             f"Pesaje inicial registrado.\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
-            f"Peso Inicial: {peso:.2f} kg — {fecha_entrada}"
+            f"Peso Inicial: {peso:.2f} kg\n"
+            f"Fecha Inicial: {fecha_entrada}"
         )
         mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
         
@@ -758,13 +761,14 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         )
         # 🔼 FIN BLOQUE GUARDADO EN MYSQL
         
-        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
             f"Pesaje único registrado.\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
-            f"Peso: {peso:.2f} kg — {fecha_actual}"
+            f"Peso: {peso:.2f} kg\n"
+            f"Fecha: {fecha_actual}"
         )
         mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
@@ -1002,17 +1006,19 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             json.dump(estado, file, indent=4)
 
         actualizar_estado_pesajes()
-        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
             f"Pesaje cerrado:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
-            f"Peso Inicial: {peso_inicial:.2f} kg — {fecha_inicial}\n"
-            f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
+            f"Peso Inicial: {peso_inicial:.2f} kg\n"
+            f"Fecha Inicial: {fecha_inicial}\n"
+            f"Peso Final: {peso_final:.2f} kg\n"
+            f"Fecha Final: {fecha_final}\n"
             f"Peso Neto: {peso_neto:.2f} kg"
         )
-        mostrar_tiquete_con_impresion("Resultado", contenido)
+        mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
 
         if refrescar_tabla_pesajes:
             refrescar_tabla_pesajes()
@@ -1039,26 +1045,28 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             json.dump(estado, file, indent=4)
 
         actualizar_estado_pesajes()
-        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
             f"Pesaje inicial registrado:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
-            f"Peso Inicial: {peso:.2f} kg — {fecha_actual}"
+            f"Peso Inicial: {peso:.2f} kg\n"
+            f"Fecha Inicial: {fecha_actual}"
         )
                 
         mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
 
     else:
         # PESAJE ÚNICO (sin cierre posterior)
-        encabezado = f"{datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
             f"Pesaje registrado sin cierre:\n"
             f"{tipo}:\n"
             f"ID: {id_ingresado}\n"
-            f"Peso: {peso:.2f} kg — {fecha_actual}"
+            f"Peso: {peso:.2f} kg\n"
+            f"Fecha: {fecha_actual}"
         )
                 
         # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (solo pesajes sin cierre)
@@ -1075,7 +1083,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         )
         # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL    
         
-        mostrar_tiquete_con_impresion("Pesaje único", contenido)
+        mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
     if refrescar_tabla_pesajes:
         refrescar_tabla_pesajes()
@@ -1312,8 +1320,10 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"NIT: {nit}\n"
                 f"Correo: {correo}\n"
                 f"ID: {id_ingresado}\n"
-                f"Peso Inicial: {peso_ini:.2f} kg — {fecha_ini}\n"
-                f"Peso Final: {peso_final:.2f} kg — {fecha_final}\n"
+                f"Peso Inicial: {peso_ini:.2f} kg\n"
+                f"Fecha Inicial: {fecha_ini}\n"
+                f"Peso Final: {peso_final:.2f} kg\n"
+                f"Fecha Final: {fecha_final}\n"
                 f"Peso Neto: {peso_neto:.2f} kg"
             )
             mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
@@ -1348,10 +1358,10 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 f"NIT: {nit}\n"
                 f"Correo: {correo}\n"
                 f"ID: {id_ingresado}\n"
-                f"Peso inicial registrado: {peso:.2f} kg\n"
-                f"Fecha: {fecha_actual}"
+                f"Peso Inicial: {peso:.2f} kg\n"
+                f"Fecha Inicial: {fecha_actual}"
             )
-            mostrar_tiquete_con_impresion("Pesaje inicial", contenido)
+            mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
         else:
             # 🟢 Nuevo comportamiento: imprimir directamente el peso actual como único pesaje
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1383,7 +1393,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             )
             # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
             
-            mostrar_tiquete_con_impresion("Pesaje único (sin cierre)", contenido)
+            mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
         if refrescar_tabla_pesajes:
             refrescar_tabla_pesajes()
@@ -1632,30 +1642,104 @@ def modulo_servicio():
         if not selected_items:
             messagebox.showwarning("Sin selección", "Seleccione un pesaje para imprimir.")
             return
+
         clave = tree.item(selected_items[0], "values")[0]
 
-        if clave in pesajes_temporales:
-            datos = pesajes_temporales[clave]
-            if len(datos) == 5:  # Externos - Tercero
-                peso, fecha, razon, nit, correo = datos
-                contenido = (
-                    f"Cliente: {razon}\n"
-                    f"NIT: {nit}\n"
-                    f"Correo: {correo}\n"
-                    f"ID: {clave}\n"
-                    f"Peso inicial registrado: {peso:.2f} kg\n"
-                    f"Fecha: {fecha}"
-                )
-            elif len(datos) == 2:  # Otros
-                peso, fecha = datos
-                contenido = (
-                    f"ID: {clave}\n"
-                    f"Peso inicial registrado: {peso:.2f} kg\n"
-                    f"Fecha: {fecha}"
-                )
+        # Cargar JSON de estado para obtener todos los campos disponibles
+        try:
+            with open(RUTA_ESTADO_PESAJES, "r") as file:
+                estado = json.load(file)
+        except FileNotFoundError:
+            messagebox.showerror("Error", "No se encontró el archivo de estado de pesajes.")
+            return
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer el archivo de estado: {e}")
+            return
+
+        if clave not in estado:
+            messagebox.showwarning("No encontrado", "El pesaje seleccionado ya no existe en el archivo de estado.")
+            return
+
+        datos = estado[clave]
+        tipo = datos.get("tipo", "Desconocido")
+
+        # 1) Tercero (pago inmediato) — tiene razon, nit, correo en el JSON
+        if datos.get("razon") and datos.get("nit"):
+            razon = datos.get("razon", "")
+            nit = datos.get("nit", "")
+            correo = datos.get("correo", "")
+            contenido = (
+                f"Cliente: {razon}\n"
+                f"NIT: {nit}\n"
+                f"Correo: {correo}\n"
+                f"ID: {datos.get('id','')}\n"
+                f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
+                f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}"
+            )
+
+        # 2) Externo (pago mensual) — el cliente está en la clave: Externo:<Cliente>:<ID>
+        elif tipo == "Externo":
+            # Extraer nombre de cliente desde la clave
+            partes = clave.split(":")
+            cliente_nombre = partes[1] if len(partes) > 1 else ""
+            # Mapeo de clientes mensuales a NIT (si deseas añadir más, agrégalas aquí)
+            mapa_nits = {
+                "Cipreses de Colombia": "890903541",
+                "Núcleos de Madera": "811016049",
+                "Construinmuniza": "900297110",
+            }
+            nit_cliente = mapa_nits.get(cliente_nombre, "")
+
+            encabezado = f"Cliente: {cliente_nombre}\nNIT: {nit_cliente}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje inicial registrado:\n"
+                f"Externo:\n"
+                f"ID: {datos.get('id','')}\n"
+                f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
+                f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}"
+            )
+
+        # 3) Internos (Aserrio / Inmuniza) — intentar inferir RG / MS del ID
+        elif tipo in ("Aserrio", "Inmuniza"):
+            id_val = datos.get("id", "")
+            # Buscar código RG o MS en el id (maneja formatos como "ABC RG123" o "ABC MS123")
+            m = re.search(r'\b(RG|MS)\b', id_val)
+            if not m:
+                m = re.search(r'(RG|MS)', id_val)
+            codigo = m.group(1) if m else None
+
+            if codigo == "RG":
+                nombre_empresa = "Reforestadora El Guásimo S.A.S"
+                nit_empresa = "8909408520"
+            elif codigo == "MS":
+                nombre_empresa = "MS Timberland Holdings Limited"
+                nit_empresa = "9004023313"
             else:
-                contenido = f"Registro: {clave}"
-            mostrar_tiquete_con_impresion("Resumen pesaje", contenido)
+                # Si no se detecta, dejamos el tipo como nombre y nit vacío
+                nombre_empresa = tipo
+                nit_empresa = ""
+
+            encabezado = f"Cliente: {nombre_empresa}\nNIT: {nit_empresa}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje inicial registrado:\n"
+                f"{tipo}:\n"
+                f"ID: {datos.get('id','')}\n"
+                f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
+                f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}"
+            )
+
+        else:
+            # Fallback por si aparece algún formato inesperado
+            contenido = (
+                f"Registro: {clave}\n"
+                f"Datos: {datos}"
+            )
+        
+        # Mostrar en ventana previa + opción de imprimir
+        mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
+        
 
     # Botón editar
     def editar_datos_pesaje():
