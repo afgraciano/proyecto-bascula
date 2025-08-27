@@ -18,11 +18,22 @@ import win32ui
 from estado_pesajes import pesajes_temporales, pesajes_confirmados
 import json
 import os #realizar operaciones sobre sistema operativo (comprueba archivo existe, elimina archivos, crea carpetas, accede path del sistema, etc.)
+import sys   # 🟢 NECESARIO para detectar si corre en .py o .exe
 
 from integracion_mysql import guardar_cliente_y_pesaje # importacion para la base de datos
 
 # Lista global para rastrear si hay ventanas de impresión abiertas
 ventanas_tiquete_abiertas = []
+
+# 🟢 CAMBIO: Detectar carpeta real, tanto en .py como en .exe
+if getattr(sys, 'frozen', False):  
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(__file__)
+
+# 🟢 CAMBIO: Ruta absoluta al JSON
+RUTA_ESTADO_PESAJES = os.path.join(BASE_DIR, "estado_actual_pesajes.json")
+
 
 # Encabezado único para impresión y preview
 ENCABEZADO_TIQUETE = (
@@ -313,7 +324,9 @@ def actualizar_estado_pesajes():
     pesajes_temporales = {}
 
     try:
-        with open("estado_actual_pesajes.json", "r") as file:
+        #with open("estado_actual_pesajes.json", "r") as file:
+        with open(RUTA_ESTADO_PESAJES, "r") as file:
+        
             estado = json.load(file)
     except FileNotFoundError:
         return
@@ -330,10 +343,19 @@ def actualizar_estado_pesajes():
                 
 
 # 🔁 Cargar estado anterior desde archivo JSON (al iniciar)
-def cargar_estado_pesajes():
+"""def cargar_estado_pesajes():
     ruta = os.path.join(os.path.dirname(__file__), 'estado_actual_pesajes.json')
     try:
         with open(ruta, 'r') as f:
+            datos = json.load(f)
+            pesajes_temporales.update(datos)
+    except Exception as e:
+        print(f"⚠️ No se pudo restaurar estado de pesajes: {e}")
+"""
+
+def cargar_estado_pesajes():
+    try:
+        with open(RUTA_ESTADO_PESAJES, 'r') as f:   # 🟢 CAMBIO: uso de ruta absoluta
             datos = json.load(f)
             pesajes_temporales.update(datos)
     except Exception as e:
@@ -342,6 +364,7 @@ def cargar_estado_pesajes():
 
 # 🟢 Llamar esta función cargar_estado_pesajes inmediatamente después de definirla
 cargar_estado_pesajes()
+
 
 # Función que se conecta al socket o modulo1 para obtener el peso actual y la hora desde modulo1
 def obtener_datos_peso():
@@ -356,12 +379,12 @@ def obtener_datos_peso():
             return peso, resultado.get("timestamp", "")
     except:
         return 0, ""
- 
+
 
 # variable global para captura de peso
 peso_capturado_global = None
 
-    
+
 # Función para confirmar o permitir ingreso manual si el peso es cero
 def confirmar_o_pedir_peso(peso, ventana):
     if peso <= 10:
@@ -614,7 +637,8 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
 def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
   
     # Cargar archivo de estado
-    archivo_estado = "estado_actual_pesajes.json"
+    #archivo_estado = "estado_actual_pesajes.json"
+    archivo_estado = RUTA_ESTADO_PESAJES
 
     try:
         with open(archivo_estado, "r") as file:
@@ -924,7 +948,8 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.   
 def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
-    archivo_estado = "estado_actual_pesajes.json"
+    #archivo_estado = "estado_actual_pesajes.json"
+    archivo_estado = RUTA_ESTADO_PESAJES
 
     try:
         with open(archivo_estado, "r") as file:
@@ -1220,7 +1245,8 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 
         # 🟡 Si ya hay pesaje iniciado → hacer cierre automático sin preguntar por inicio
         try:
-            with open("estado_actual_pesajes.json", "r") as file:
+            #with open("estado_actual_pesajes.json", "r") as file:
+            with open(RUTA_ESTADO_PESAJES, "r") as file:
                 estado = json.load(file)
         except FileNotFoundError:
             estado = {}
@@ -1274,7 +1300,8 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 
 
             del estado[clave_existente]
-            with open("estado_actual_pesajes.json", "w") as file:
+            #with open("estado_actual_pesajes.json", "w") as file:
+            with open(RUTA_ESTADO_PESAJES, "w") as file:
                 json.dump(estado, file, indent=4)
 
 
@@ -1311,7 +1338,8 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 "correo": correo
             }
 
-            with open("estado_actual_pesajes.json", "w") as file:
+            #with open("estado_actual_pesajes.json", "w") as file:
+            with open(RUTA_ESTADO_PESAJES, "w") as file:
                 json.dump(estado, file, indent=4)
 
             actualizar_estado_pesajes()

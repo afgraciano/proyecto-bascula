@@ -1,0 +1,9 @@
+Para extraer el icono del ejecutable ConfigBascula.exe en Windows:
+
+1. Descarga e instala Resource Hacker (http://www.angusj.com/resourcehacker/).
+2. Ábrelo y selecciona ConfigBascula.exe.
+3. En el árbol de recursos, abre 'Icon Group'.
+4. Haz clic derecho sobre el icono y selecciona 'Save [Icon Group] as .ico...'.
+5. Guarda el archivo como python_installer.ico y luego podrás usarlo en Bat To Exe Converter.
+
+Alternativa: también puedes usar herramientas como IconsExtract o IcoFX.
