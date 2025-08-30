@@ -2,6 +2,7 @@
 import mysql.connector
 from datetime import datetime
 
+
 def conectar():
     return mysql.connector.connect(
         host="localhost",
@@ -10,7 +11,57 @@ def conectar():
         database="bascula_silvotecnia"
     )
 
+
+# =======================
+#  GESTIÓN DE USUARIOS
+# =======================
+
+def registrar_personal(nombre, login, password, cedula):
+    
+    """
+    Registra un nuevo usuario autorizado en la tabla personal_autorizado.
+    """
+    conexion = conectar()
+    cursor = conexion.cursor()
+    cursor.execute("""
+        INSERT INTO personal_autorizado (nombre, login, password, cedula)
+        VALUES (%s, %s, %s, %s)
+    """, (nombre, login, password, cedula))
+    conexion.commit()
+    conexion.close()
+    print(f"✅ Usuario {nombre} registrado con éxito.")
+
+
+def autenticar_usuario(login, password):
+    
+    """
+    Valida login y contraseña. Retorna diccionario con datos del usuario si existe.
+    """
+    
+    conexion = conectar()
+    cursor = conexion.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT * FROM personal_autorizado
+        WHERE login=%s AND password=%s
+    """, (login, password))
+    usuario = cursor.fetchone()
+    conexion.close()
+    if usuario:
+        print(f"✅ Usuario {usuario['nombre']} autenticado.")
+    else:
+        print("❌ Login o contraseña incorrectos.")
+    return usuario
+   
+
+# =======================
+#  GESTIÓN DE EVENTOS
+# =======================
 def guardar_evento_desconexion(tipo):
+    
+    """
+    Guarda un evento de desconexión en la tabla 'desconexiones'.
+    """
+    
     try:
         conexion = conectar()
         cursor = conexion.cursor()
@@ -27,8 +78,18 @@ def guardar_evento_desconexion(tipo):
         print("✅ Evento de desconexión guardado.")
     except Exception as e:
         print(f"❌ Error guardando desconexión: {e}")
+        
+        
+# =======================
+# GESTIÓN DE CLIENTES Y PESAJE
+# =======================
 
-def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje):
+def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autorizado):
+    
+    """
+    Guarda un cliente (según tipo) y un pesaje relacionado, ligado al usuario autorizado.
+    """
+    
     try:
         conexion = conectar()
         cursor = conexion.cursor()
@@ -72,18 +133,16 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje):
 
         peso_bruto = datos_pesaje.get("peso_bruto")
         peso_tara = datos_pesaje.get("peso_tara")
-        #peso_neto = None
         peso_neto = datos_pesaje.get("peso_neto")  # intenta usar el valor si ya existe
 
         if peso_neto is None and peso_bruto is not None and peso_tara is not None:
-        #if peso_bruto is not None and peso_tara is not None:
             peso_neto = abs(peso_bruto - peso_tara)
             
 
         cursor.execute("""
             INSERT INTO pesajes (
-                fecha_hora, tipo_cliente, peso_bruto, peso_tara, peso_neto, placa, id_cliente
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                fecha_hora, tipo_cliente, peso_bruto, peso_tara, peso_neto, placa, id_cliente, id_autorizado
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             datetime.now(),
             tipo_cliente,
@@ -91,7 +150,8 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje):
             peso_tara,
             peso_neto,
             datos_pesaje.get("placa"),
-            id_cliente
+            id_cliente,
+            id_autorizado
         ))
 
         conexion.commit()

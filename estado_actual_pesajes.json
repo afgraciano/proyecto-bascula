@@ -1,1 +1,23 @@
-{}
+{
+    "Externo:Tercero (pago inmediato):KKY168:A:1": {
+        "tipo": "Externo",
+        "id": "KKY168",
+        "peso_entrada": 6250,
+        "fecha_hora_entrada": "2025-08-14 19:09:31",
+        "razon": "A",
+        "nit": "1",
+        "correo": ""
+    },
+    "Aserrio:KKY168 MS123": {
+        "tipo": "Aserrio",
+        "id": "KKY168 MS123",
+        "peso_entrada": 10000,
+        "fecha_hora_entrada": "2025-08-14 19:09:42"
+    },
+    "Externo:N\u00facleos de Madera:KKY168 123": {
+        "tipo": "Externo",
+        "id": "KKY168 123",
+        "peso_entrada": 10000,
+        "fecha_hora_entrada": "2025-08-14 19:09:57"
+    }
+}
