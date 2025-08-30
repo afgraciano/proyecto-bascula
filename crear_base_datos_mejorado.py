@@ -72,6 +72,34 @@ CREATE TABLE IF NOT EXISTS desconexiones (
 )
 ''')
 
+
+# Tabla personal autorizado
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS personal_autorizado (
+    id_autorizado INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    login VARCHAR(100) UNIQUE NOT NULL,
+    password VARCHAR(20) NOT NULL,
+    cedula VARCHAR(20) NOT NULL,
+    CHECK (CHAR_LENGTH(password) BETWEEN 4 AND 20)
+)
+''')
+
+# Verificar si la columna id_autorizado ya existe en pesajes
+cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'id_autorizado'")
+columna = cursor.fetchone()
+
+if not columna:
+    cursor.execute('''
+    ALTER TABLE pesajes
+    ADD COLUMN id_autorizado INT,
+    ADD CONSTRAINT fk_autorizado FOREIGN KEY (id_autorizado) REFERENCES personal_autorizado(id_autorizado)
+    ''')
+    print("✅ Columna id_autorizado agregada a la tabla pesajes.")
+else:
+    print("ℹ️ La columna id_autorizado ya existe en pesajes.")
+    
+    
 conexion.commit()
 conexion.close()
 print("✅ Todas las tablas fueron creadas correctamente.")

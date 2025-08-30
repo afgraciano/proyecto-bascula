@@ -18,7 +18,7 @@ import shutil
 def crear_base_access(ruta):
     # Crea archivo .accdb vacío
     engine = win32com.client.Dispatch("DAO.DBEngine.120")  # Para Access 2007+
-    db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)  
+    db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)
     db.Close()
 
 
@@ -91,8 +91,8 @@ def imprimir_tiquete(texto, impresora=None):
         hdc.DeleteDC()
     finally:
         win32print.ClosePrinter(hprinter)
-        
-        
+
+
 # === Gestión de archivo puntero para impresión ===
 # proceso_impresion_activo_reportes() -> Verifica si hay impresión activa
 # cerrar_proceso_impresion() -> Elimina el puntero cuando ya no hay ventanas abiertas
@@ -168,7 +168,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
             imprimir_tiquete(texto_completo)
         except Exception as e:
             messagebox.showerror("Error de impresión", f"No se pudo imprimir.\n{e}")
-        
+
     # --- Botón seleccionar impresora ---
     def seleccionar_e_imprimir():
         sub = tk.Toplevel()
@@ -184,19 +184,19 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
 
         impresoras = win32print.EnumPrinters(2)
         nombres = [p[2] for p in impresoras]
-        
+
         if not nombres:
             messagebox.showerror("Error", "No se encontraron impresoras instaladas.")
             sub.destroy()
             return
-                
+
         seleccion = tk.StringVar(value=nombres[0] if nombres else "")
 
         lista = tk.OptionMenu(sub, seleccion, *nombres)
         lista.config(width=40)
         lista.pack(pady=5)
 
-  
+
         def imprimir_seleccionada():
             impresora = seleccion.get()
 
@@ -226,7 +226,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     tk.Button(frame_botones, text="❌ Cerrar", command=cerrar_ventana).pack(side="left", padx=5)
 
     ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
-    
+
 
 
 # Importa pyodbc si está disponible, para exportar a Access
@@ -240,7 +240,7 @@ try:
     from fpdf import FPDF
 except ImportError:
     FPDF = None
-    
+
 
 
 # === Clase principal para la interfaz de reportes ===
@@ -257,7 +257,7 @@ class ReportesBasculaApp:
                 "Ya hay un tiquete abierto.\n\nCierre la ventana actual antes de abrir otro."
             )
             return
-        
+
         selected = self.tree.selection()
         if not selected:
             messagebox.showwarning("Sin selección", "Seleccione un registro para imprimir.")
@@ -297,7 +297,7 @@ class ReportesBasculaApp:
         )
         # mostramos el tiquete (crea el puntero)
         mostrar_tiquete_con_impresion("Reporte de Báscula", contenido)
-    
+
     # Funcion para seleccionar fechas en calendario
     def seleccionar_fecha(self, entry_widget):
         top = tk.Toplevel(self.root)
@@ -330,15 +330,15 @@ class ReportesBasculaApp:
         
         #if os.path.exists(ARCHIVO_PUNTERO_IMPRESION):
             #os.remove(ARCHIVO_PUNTERO_IMPRESION)
-        
+
         self.db_password = "bascula2025"  # guardo la contraseña de MySQL dentro de la clase para ser usada
         
         self.root = root
         self.root.title("Consulta y Reportes - Báscula")
-        self.root.geometry("1100x650")  # Tamaño inicial de ventana
+        self.root.geometry("1300x650")  # Tamaño inicial de ventana
         #desde aqui hubico la ventana en la mitad de la pantalla
         # Tamaño inicial
-        ancho_ventana = 1100
+        ancho_ventana = 1300
         alto_ventana = 650
 
         # Obtener dimensiones de la pantalla
@@ -481,7 +481,7 @@ class ReportesBasculaApp:
     #funcion para ajustar las columnas
     def autoajustar_columnas(self, max_filas=200):
         filas = self.tree.get_children()[:max_filas]  # solo primeras 200 filas
-        
+
         for col in self.tree["columns"]:
             longitudes = [len(str(self.tree.set(k, col))) for k in filas]
             longitudes.append(len(col))  # también medir el nombre de la columna
@@ -520,7 +520,7 @@ class ReportesBasculaApp:
         except mysql.connector.Error as err:
             messagebox.showerror("Error de conexión", f"No se pudo conectar a la base de datos.\n\nDetalles: {err}")
             return
-        
+
 
         if tipo == "pesajes":
             # Iniciamos la lista de parámetros para la consulta SQL.
@@ -534,11 +534,16 @@ class ReportesBasculaApp:
                 # LEFT JOIN asegura que aunque no exista fila en cliente_tercero, el pesaje se devuelva (con campos NULL).
                 # WHERE p.fecha_hora BETWEEN %s AND %s usa los dos primeros parámetros en `valores`.
                 consulta = """
-                    SELECT p.id_pesaje, t.id_ingresado, p.fecha_hora, p.tipo_cliente, p.peso_bruto,
-                        p.peso_tara, p.peso_neto, p.placa,
-                        t.nombre, t.cedula_nit, t.correo_remision
+                    SELECT p.id_pesaje, 
+                        t.id_ingresado, 
+                        p.fecha_hora, 
+                        p.tipo_cliente,
+                        p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        t.nombre, t.cedula_nit, t.correo_remision,
+                        SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
                     LEFT JOIN cliente_tercero t ON p.id_cliente = t.id_cliente
+                    LEFT JOIN personal_autorizado pa ON p.id_autorizado = pa.id_autorizado
                     WHERE p.fecha_hora BETWEEN %s AND %s
                 """
             # Si el filtro es "mensual" -> hacemos JOIN con cliente_mensual
@@ -546,11 +551,16 @@ class ReportesBasculaApp:
                 # Seleccionamos los campos del pesaje y de la tabla cliente_mensual.
                 # Alias m.nit AS cedula_nit se usa para normalizar el nombre de columna (para que el resto del código lo vea igual).
                 consulta = """
-                    SELECT p.id_pesaje, m.id_ingresado, p.fecha_hora, p.tipo_cliente, p.peso_bruto,
-                        p.peso_tara, p.peso_neto, p.placa,
-                        m.nombre, m.nit AS cedula_nit, NULL AS correo_remision
+                    SELECT p.id_pesaje,
+                        m.id_ingresado, 
+                        p.fecha_hora, 
+                        p.tipo_cliente,
+                        p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        m.nombre, m.nit, NULL AS correo_remision,
+                        SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
                     LEFT JOIN cliente_mensual m ON p.id_cliente = m.id_cliente
+                    LEFT JOIN personal_autorizado pa ON p.id_autorizado = pa.id_autorizado
                     WHERE p.fecha_hora BETWEEN %s AND %s
                 """
             # Si el filtro es "interno" -> hacemos JOIN con cliente_interno
@@ -559,11 +569,14 @@ class ReportesBasculaApp:
                 # Como cliente_interno no tiene campo 'correo_remision', devolvemos NULL AS correo_remision
                 # y renombramos i.nit como cedula_nit para coherencia con la interfaz.
                 consulta = """
-                    SELECT p.id_pesaje, i.id_ingresado, p.fecha_hora, i.tipo AS tipo_cliente, p.peso_bruto,
-                        p.peso_tara, p.peso_neto, p.placa,
-                        i.nombre, i.nit AS cedula_nit, NULL AS correo_remision
+                    SELECT p.id_pesaje,
+                        i.id_ingresado, p.fecha_hora, i.tipo AS tipo_cliente,
+                        p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        i.nombre, i.nit, NULL AS correo_remision,
+                        SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
                     LEFT JOIN cliente_interno i ON p.id_cliente = i.id_cliente
+                    LEFT JOIN personal_autorizado pa ON p.id_autorizado = pa.id_autorizado
                     WHERE p.fecha_hora BETWEEN %s AND %s
                 """
             else:  # Si no se pidió un tipo específico -> "Todos"
@@ -578,14 +591,16 @@ class ReportesBasculaApp:
                         p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
                         COALESCE(t.nombre, m.nombre, i.nombre) AS nombre,
                         COALESCE(t.cedula_nit, m.nit, i.nit) AS cedula_nit,
-                        COALESCE(t.correo_remision, '') AS correo_remision
+                        COALESCE(t.correo_remision, '') AS correo_remision,
+                        SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
                     LEFT JOIN cliente_tercero t ON (p.tipo_cliente = 'tercero' AND p.id_cliente = t.id_cliente)
                     LEFT JOIN cliente_mensual m ON (p.tipo_cliente = 'mensual' AND p.id_cliente = m.id_cliente)
                     LEFT JOIN cliente_interno i ON (p.tipo_cliente = 'interno' AND p.id_cliente = i.id_cliente)
+                    LEFT JOIN personal_autorizado pa ON p.id_autorizado = pa.id_autorizado
                     WHERE p.fecha_hora BETWEEN %s AND %s
                 """
-               
+
             # ---- A partir de aquí agregamos filtros dinámicos según lo que el usuario haya puesto ----
 
             # Si se especificó un tipo_cliente (no vacío), añadimos una condición para filtrar por tipo_cliente.
@@ -702,7 +717,7 @@ class ReportesBasculaApp:
                 messagebox.showerror("Error", f"No se puede sobrescribir el archivo.\nAsegúrate de cerrarlo primero:\n{archivo}")
 
 
-   
+
     # === Exportación a ACCESS ===
     def exportar_access(self):
         if not self.datos_actuales:
@@ -746,7 +761,7 @@ class ReportesBasculaApp:
                 return
             # Si no era ese error, se continúa sin eliminar la tabla
 
-        
+
             # Crear nueva conexión para insertar datos
         try:
             conn = pyodbc.connect(conn_str)
@@ -788,7 +803,7 @@ class ReportesBasculaApp:
         if archivo:
             pdf = FPDF(orientation="L", unit="mm", format="A4")  # Horizontal
             pdf.add_page()
-            pdf.set_font("Consolas", size=7)    
+            pdf.set_font("Consolas", size=7)
             
             datos_export = self._preparar_datos_exportacion()
             df = pd.DataFrame(datos_export)

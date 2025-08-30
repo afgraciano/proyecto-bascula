@@ -1,32 +1,23 @@
 {
-    "Externo:Tercero (pago inmediato):ASD654 123:Gilberto Hinestroza:789456123": {
+    "Externo:Tercero (pago inmediato):KKY168:A:1": {
         "tipo": "Externo",
-        "id": "ASD654 123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:03:31",
-        "razon": "Gilberto Hinestroza",
-        "nit": "789456123",
-        "correo": "gilberto@hotmail.com"
-    },
-    "Externo:Cipreses de Colombia:KKY321 654": {
-        "tipo": "Externo",
-        "id": "KKY321 654",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:07:59"
+        "id": "KKY168",
+        "peso_entrada": 6250,
+        "fecha_hora_entrada": "2025-08-14 19:09:31",
+        "razon": "A",
+        "nit": "1",
+        "correo": ""
     },
     "Aserrio:KKY168 MS123": {
         "tipo": "Aserrio",
         "id": "KKY168 MS123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:23:24"
+        "peso_entrada": 10000,
+        "fecha_hora_entrada": "2025-08-14 19:09:42"
     },
-    "Externo:Tercero (pago inmediato):ABC123 456:Andres:71375473": {
+    "Externo:N\u00facleos de Madera:KKY168 123": {
         "tipo": "Externo",
-        "id": "ABC123 456",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 21:34:09",
-        "razon": "Andres",
-        "nit": "71375473",
-        "correo": "ag@gmail.com"
+        "id": "KKY168 123",
+        "peso_entrada": 10000,
+        "fecha_hora_entrada": "2025-08-14 19:09:57"
     }
 }
