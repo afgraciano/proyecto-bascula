@@ -29,7 +29,7 @@ def registrar_personal(nombre, login, password, cedula):
     """, (nombre, login, password, cedula))
     conexion.commit()
     conexion.close()
-    #print(f" Usuario {nombre} registrado con éxito.")
+    print(f"✅ Usuario {nombre} registrado con éxito.")
 
 
 def autenticar_usuario(login, password):
@@ -47,18 +47,16 @@ def autenticar_usuario(login, password):
     usuario = cursor.fetchone()
     conexion.close()
     if usuario:
-        #print(f" Usuario {usuario['nombre']} autenticado.")
-        pass
+        print(f"✅ Usuario {usuario['nombre']} autenticado.")
     else:
-        #print(" Login o contraseña incorrectos.")
-        pass
+        print("❌ Login o contraseña incorrectos.")
     return usuario
    
 
 # =======================
 #  GESTIÓN DE EVENTOS
 # =======================
-def guardar_evento_desconexion(tipo, tiempo_desconexion=0, id_autorizado=None):
+def guardar_evento_desconexion(tipo, tiempo_desconexion=0):
     
     """
     Guarda un evento de desconexión en la tabla 'desconexiones', incluyendo el tiempo de desconexión en segundos.
@@ -68,21 +66,19 @@ def guardar_evento_desconexion(tipo, tiempo_desconexion=0, id_autorizado=None):
         conexion = conectar()
         cursor = conexion.cursor()
         cursor.execute("""
-            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion, tiempo_desconexion, id_autorizado)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion, tiempo_desconexion)
+            VALUES (%s, %s, %s, %s)
         """, (
             datetime.now(),
             tipo,
             f"Evento de desconexión detectado: {tipo}",
-            tiempo_desconexion,
-            id_autorizado
+            tiempo_desconexion
         ))
         conexion.commit()
         conexion.close()
-        #print(" Evento de desconexión guardado con {tiempo_desconexion} segundos.")
+        print("✅ Evento de desconexión guardado con {tiempo_desconexion} segundos.")
     except Exception as e:
-        #print(f" Error guardando desconexión: {e}")
-        pass
+        print(f" Error guardando desconexión: {e}")
         
         
 # =======================
@@ -161,7 +157,6 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
 
         conexion.commit()
         conexion.close()
-        #print(" Cliente y pesaje guardados con peso_neto.")
+        print("✅ Cliente y pesaje guardados con peso_neto.")
     except Exception as e:
-        #print(f" Error guardando cliente y pesaje: {e}")
-        pass
+        print(f"❌ Error guardando cliente y pesaje: {e}")
