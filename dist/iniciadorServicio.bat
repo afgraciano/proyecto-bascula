@@ -4,11 +4,11 @@ setlocal
 :: ================================
 :: 🚀 Configuración inicial
 :: ================================
-set EXE=BasculaMonitor.exe
-set SHORTCUT=BasculaMonitor.lnk
+set "EXE=BasculaMonitor.exe"
+set "SHORTCUT=BasculaMonitor.lnk"
 
 :: Carpeta donde está este .bat (y el exe)
-set APPDIR=%~dp0
+set "APPDIR=%~dp0"
 
 echo ================================
 echo 🚀 Configurando %EXE%
@@ -18,15 +18,16 @@ echo ================================
 :: ================================
 :: 1. Crear acceso directo en Inicio de Windows
 :: ================================
-set STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
+set "STARTUP_FOLDER=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
 echo 📌 Creando acceso directo en: %STARTUP_FOLDER%
 
-:: Crear acceso directo con PowerShell
-powershell -command ^
-  "$s=(New-Object -COM WScript.Shell).CreateShortcut('%STARTUP_FOLDER%\%SHORTCUT%'); ^
-   $s.TargetPath='%APPDIR%%EXE%'; ^
-   $s.WorkingDirectory='%APPDIR%'; ^
-   $s.Save()"
+:: Crear acceso directo usando PowerShell, de manera robusta
+powershell -NoProfile -Command ^
+"$WshShell = New-Object -ComObject WScript.Shell; ^
+$Shortcut = $WshShell.CreateShortcut('%STARTUP_FOLDER%\%SHORTCUT%'); ^
+$Shortcut.TargetPath = '%APPDIR%%EXE%'; ^
+$Shortcut.WorkingDirectory = '%APPDIR%'; ^
+$Shortcut.Save()"
 
 if exist "%STARTUP_FOLDER%\%SHORTCUT%" (
     echo ✅ Acceso directo creado correctamente.
@@ -35,12 +36,12 @@ if exist "%STARTUP_FOLDER%\%SHORTCUT%" (
 )
 
 :: ================================
-:: 2. Lanzar el servicio inmediatamente
+:: 2. Lanzar el servicio inmediatamente sin ventana de CMD
 :: ================================
 echo ▶️ Iniciando %EXE% ahora mismo...
-start "" "%APPDIR%%EXE%"
+start "" /b "" "%APPDIR%%EXE%"
 
 echo ================================
 echo ✅ Configuración finalizada.
 echo ================================
-pause
+timeout /t 3 >nul
