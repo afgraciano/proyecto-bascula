@@ -28,5 +28,12 @@
         "razon": "Andres",
         "nit": "71375473",
         "correo": "ag@gmail.com"
+    },
+    "Astillable:KKY168 MS123": {
+        "tipo": "Astillable",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-10 01:45:20",
+        "id_autorizado": 1
     }
 }

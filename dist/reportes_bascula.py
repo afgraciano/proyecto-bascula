@@ -3,35 +3,52 @@ import tkinter as tk  # Para la interfaz gráfica
 from tkinter import ttk, messagebox, filedialog  # Widgets y mensajes de Tkinter
 from datetime import datetime  # Para manejar fechas
 from datetime import timedelta #para tomar reportes del ultimo dia
-from tkcalendar import Calendar #para usar calendario
-import mysql.connector  # Conexión a MySQL
-import pandas as pd  # Manipulación de datos y exportación a Excel
 import os  # Operaciones con archivos y deteccion de ejecutables
-import tkinter.font as tkFont #para autoajustar las columnas
-import subprocess #importo subprocesos para realizar copias de seguridad de Mysql
-import win32print, win32ui # 🆕 Para impresión
-import win32com.client
-import pyodbc
-import shutil
 
 
+
+
+    
+#  Función global para centrar cualquier ventana (Tk o Toplevel)
+def centrar_ventana(ventana, ancho=1300, alto=650, margen_superior=None):
+    """
+    Centra una ventana (Tk o Toplevel) en la pantalla con el tamaño indicado.
+    
+    Parámetros:
+        ventana         -> instancia de Tk() o Toplevel()
+        ancho (int)     -> ancho de la ventana en píxeles (default 1300)
+        alto (int)      -> alto de la ventana en píxeles (default 650)
+        margen_superior -> si se pasa, reemplaza la posición vertical (y),
+                           útil por ejemplo para ventanas de impresión
+    """
+    #  Asegura que la ventana ya haya calculado medidas internas
+    ventana.update_idletasks()
+
+    #  Obtener dimensiones de la pantalla
+    ancho_pantalla = ventana.winfo_screenwidth()
+    alto_pantalla = ventana.winfo_screenheight()
+
+    #  Calcular posición horizontal (siempre centrada)
+    pos_x = int((ancho_pantalla / 2) - (ancho / 2))
+
+    #  Calcular posición vertical
+    if margen_superior is None:
+        pos_y = int((alto_pantalla / 2) - (alto / 2))  # Centrado vertical
+    else:
+        pos_y = margen_superior  # Usar el valor dado
+
+    #  Aplicar tamaño y posición
+    ventana.geometry(f"{ancho}x{alto}+{pos_x}+{pos_y}")
+
+# === Función auxiliar para crear base Access vacía ===
 def crear_base_access(ruta):
-    # Crea archivo .accdb vacío
-    engine = win32com.client.Dispatch("DAO.DBEngine.120")  # Para Access 2007+
-    db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)  
-    db.Close()
-
-
-# Funcion para centrar la ventana principal
-def centrar_ventana(ventana, ancho, alto, margen_superior=50):
-    ventana.update_idletasks()  # Asegura que se puedan obtener dimensiones actualizadas
-    pantalla_ancho = ventana.winfo_screenwidth()
-    pantalla_alto = ventana.winfo_screenheight()
-
-    x = (pantalla_ancho - ancho) // 2
-    y = margen_superior  # Espacio desde la parte superior
-    ventana.geometry(f"{ancho}x{alto}+{x}+{y}")
-
+    try:
+        import win32com.client  # libreria importada
+        engine = win32com.client.Dispatch("DAO.DBEngine.120")
+        db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)
+        db.Close()    
+    except ImportError:
+        messagebox.showerror("Error", "win32com.client no está instalado. No se puede crear Access.")
 
 
 # === Encabezado único para impresión y preview ===
@@ -44,6 +61,9 @@ ENCABEZADO_TIQUETE = (
 
 # === Función para imprimir directamente en impresora ===
 def imprimir_tiquete(texto, impresora=None):
+    import win32print, win32ui # librerias Para impresión
+    
+    #  Obtener impresora por defecto si no se pasó
     if impresora is None:
         impresora = win32print.GetDefaultPrinter()
 
@@ -51,47 +71,74 @@ def imprimir_tiquete(texto, impresora=None):
         messagebox.showerror("Error impresión", "No hay impresora predeterminada configurada.")
         return
 
-    hprinter = win32print.OpenPrinter(impresora)
+    hprinter = None
+    hdc = None
     try:
+        hprinter = win32print.OpenPrinter(impresora)
+        # Crear DC de impresora
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(impresora)
 
-        dpi = hdc.GetDeviceCaps(88)       # LOGPIXELSX
+        # Medidas del dispositivo
         width_px = hdc.GetDeviceCaps(110) # HORZRES
         height_px = hdc.GetDeviceCaps(111)# VERTRES
 
-        chars_per_line = max(len(line) for line in texto.split("\n")) or 1
-        font_size = max(24, int(width_px / (chars_per_line + 2)))
+        # >>> robustez: obtener líneas y calcular la longitud máxima <<<
+        lines = texto.splitlines()
+        if not lines:
+            lines = [""]  # asegurar al menos una línea
+        chars_per_line = max(len(line) for line in lines)
 
+        # Calcular tamaño de fuente según la línea más larga (heurística)
+        font_size = max(24, int(width_px / (chars_per_line + 2)))
+        font_size = min(font_size, 240)
+
+        # Iniciar documento
         hdc.StartDoc("Tiquete Báscula")
         hdc.StartPage()
 
+        # Crear y seleccionar fuente y dibujo
         fuente = win32ui.CreateFont({"name": "Consolas", "height": font_size, "weight": 700})
         hdc.SelectObject(fuente)
 
+        # Espaciado y posición inicial
+        x_margin = 50
         y = 50
-        line_spacing = int(font_size * 1.5)
+        line_spacing = max(12, int(font_size * 1.5))
 
-        # Encabezado
-        fuente_titulo = win32ui.CreateFont({"name": "Consolas", "height": font_size + 8, "weight": 900})
-        hdc.SelectObject(fuente_titulo)
-        for linea_titulo in ENCABEZADO_TIQUETE.strip().split("\n"):
-            hdc.TextOut(50, y, linea_titulo)
+        # Imprimir cada línea y paginar si es necesario
+        for linea in lines:
+            hdc.TextOut(x_margin, y, linea)
             y += line_spacing
+            if y + line_spacing > height_px - 50:  # margen inferior
+                hdc.EndPage()
+                hdc.StartPage()
+                hdc.SelectObject(fuente)
+                y = 50
 
-        y += line_spacing
-        fuente_normal = win32ui.CreateFont({"name": "Consolas", "height": font_size, "weight": 700})
-        hdc.SelectObject(fuente_normal)
-        for linea in texto.split("\n"):
-            hdc.TextOut(50, y, linea)
-            y += line_spacing
-
+        # Cerrar página y documento
         hdc.EndPage()
         hdc.EndDoc()
-        hdc.DeleteDC()
+
+    except Exception as e:
+        try:
+            messagebox.showerror("Error de impresión", f"No se pudo imprimir.\n\n{e}")
+        except:
+            pass
+
     finally:
-        win32print.ClosePrinter(hprinter)
-        
+        # Liberar DC si existe
+        try:
+            if hdc:
+                hdc.DeleteDC()
+        except:
+            pass
+        # Cerrar impresora
+        try:
+            if hprinter:
+                win32print.ClosePrinter(hprinter)
+        except:
+            pass    
         
 # === Gestión de archivo puntero para impresión ===
 # proceso_impresion_activo_reportes() -> Verifica si hay impresión activa
@@ -118,6 +165,7 @@ ventanas_tiquete_abiertas = []
 
 # === Ventana preview de tiquete (con puntero activo) ===
 def mostrar_tiquete_con_impresion(titulo, contenido):
+    import win32print #libreria para impresion
     """
     Muestra un tiquete en ventana de preview e imprime.
     Solo permite un tiquete activo a la vez.
@@ -229,28 +277,14 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     
 
 
-# Importa pyodbc si está disponible, para exportar a Access
-try:
-    import pyodbc
-except ImportError:
-    pyodbc = None
-
-# Importa FPDF si está disponible, para exportar a PDF
-try:
-    from fpdf import FPDF
-except ImportError:
-    FPDF = None
-    
-
-
 # === Clase principal para la interfaz de reportes ===
 class ReportesBasculaApp:
     
     # ==========================================================
-    # 📌 MÉTODO DE IMPRESIÓN DE REGISTROS SELECCIONADOS EN TABLA
+    #  MÉTODO DE IMPRESIÓN DE REGISTROS SELECCIONADOS EN TABLA
     # ==========================================================
     def imprimir_seleccionado(self):
-        # ✅ Bloquear si ya hay un tiquete abierto
+        #  Bloquear si ya hay un tiquete abierto
         if proceso_impresion_activo():
             messagebox.showinfo(
                 "Impresión en curso",
@@ -270,12 +304,14 @@ class ReportesBasculaApp:
         tipo_cliente = datos.get("tipo_cliente", "desconocido")
         nombre = datos.get("nombre", "N/A")
         nit = datos.get("cedula_nit", "N/A")
+        #tipo = datos.get("tipo_cliente")
         fecha = datos.get("fecha_hora", "")
         bruto = datos.get("peso_bruto", 0)
         tara = datos.get("peso_tara", 0)
         neto = datos.get("peso_neto", 0)
         placa = datos.get("placa", "")
 
+        
         # --- Detectar empresa según tipo_cliente ---
         if tipo_cliente == "interno":
             if "RG" in str(id_ingresado):
@@ -288,6 +324,8 @@ class ReportesBasculaApp:
         contenido = (
             f"Cliente: {nombre}\n"
             f"NIT: {nit}\n"
+            f"Pesaje final registrado.\n"
+            f"{tipo_cliente}:\n"
             f"ID: {id_ingresado}\n"
             f"Placa: {placa}\n"
             f"Peso Bruto: {bruto} kg\n"
@@ -300,6 +338,7 @@ class ReportesBasculaApp:
     
     # Funcion para seleccionar fechas en calendario
     def seleccionar_fecha(self, entry_widget):
+        from tkcalendar import Calendar #libreria para usar calendario
         top = tk.Toplevel(self.root)
         top.title("Seleccionar fecha")
         top.transient(self.root)   # Asociar a ventana principal
@@ -317,44 +356,11 @@ class ReportesBasculaApp:
 
         ttk.Button(top, text="OK", command=confirmar).pack()
     
-    # Constructor de clase ReportesBasculaApp.
-    """
-    - Inicializa la ventana principal y todos los elementos de la interfaz gráfica:
-    - Configuración inicial de la ventana (título, tamaño).
-    - Creación de filtros de búsqueda (tipo de reporte, fechas, cliente, etc.).
-    - Configuración de botones de consulta y exportación (Excel, Access, PDF).
-    - Creación de la tabla Treeview con scrollbars para mostrar resultados.
-    - Definición de variables internas para manejo de datos.
-    """
-    def __init__(self, root):
-        
-        #if os.path.exists(ARCHIVO_PUNTERO_IMPRESION):
-            #os.remove(ARCHIVO_PUNTERO_IMPRESION)
-        
-        self.db_password = "bascula2025"  # guardo la contraseña de MySQL dentro de la clase para ser usada
-        
-        self.root = root
-        self.root.title("Consulta y Reportes - Báscula")
-        self.root.geometry("1300x650")  # Tamaño inicial de ventana
-        #desde aqui hubico la ventana en la mitad de la pantalla
-        # Tamaño inicial
-        ancho_ventana = 1300
-        alto_ventana = 650
-
-        # Obtener dimensiones de la pantalla
-        ancho_pantalla = self.root.winfo_screenwidth()
-        alto_pantalla = self.root.winfo_screenheight()
-
-        # Calcular posición x, y para centrar
-        pos_x = int((ancho_pantalla / 2) - (ancho_ventana / 2))
-        pos_y = int((alto_pantalla / 2) - (alto_ventana / 2))
-
-        # Establecer tamaño y posición centrada
-        self.root.geometry(f"{ancho_ventana}x{alto_ventana}+{pos_x}+{pos_y}")
-        
-        #hasta aqui es para centrar el programa en la pantalla al iniciar
-        
-
+    # ==========================================================
+    # MÉTODO PARA CREAR TODOS LOS WIDGETS DE LA INTERFAZ
+    # ==========================================================
+    def crear_widgets(self):
+        # Variable para seleccionar tipo de reporte (por defecto: "pesajes")
         self.tipo_reporte = tk.StringVar(value="pesajes")  # Valor predeterminado
 
         # ==== Frame o seleccion de filtros ====
@@ -369,8 +375,7 @@ class ReportesBasculaApp:
         # Fechas de búsqueda
         # Filtro: Fecha inicial
         ttk.Label(filtro_frame, text="Fecha inicial (YYYY-MM-DD):").grid(row=0, column=2, padx=5) #label trasparente indicar formato fecha
-        #self.fecha_inicio = ttk.Entry(filtro_frame)
-        #self.fecha_inicio.grid(row=0, column=3, padx=5)
+
 
         frame_fecha_inicio = ttk.Frame(filtro_frame)  # Contenedor para campo + botón
         frame_fecha_inicio.grid(row=0, column=3, padx=5, pady=5)
@@ -378,23 +383,20 @@ class ReportesBasculaApp:
         self.fecha_inicio.pack(side="left", fill="x", expand=True)
 
         # Botón calendario inicio
-        #ttk.Button(filtro_frame, text="📅", width=3, command=lambda: self.seleccionar_fecha(self.fecha_inicio)).grid(row=0, column=4, padx=2)
         ttk.Button(frame_fecha_inicio, text="📅", width=2, command=lambda: self.seleccionar_fecha(self.fecha_inicio)).pack(side="right")
         
         # Filtro: Fecha final
         ttk.Label(filtro_frame, text="Fecha final (YYYY-MM-DD):").grid(row=0, column=4, padx=5)#label trasparente indicar formato fecha
-        #self.fecha_fin = ttk.Entry(filtro_frame)
-        #self.fecha_fin.grid(row=0, column=5, padx=5)
+
         frame_fecha_fin = ttk.Frame(filtro_frame)  # Contenedor para campo + botón
         frame_fecha_fin.grid(row=0, column=5, padx=5, pady=5)
         self.fecha_fin = ttk.Entry(frame_fecha_fin, width=12)
         self.fecha_fin.pack(side="left", fill="x", expand=True)
         
         # Botón calendario final
-        #ttk.Button(filtro_frame, text="📅", width=3, command=lambda: self.seleccionar_fecha(self.fecha_fin)).grid(row=0, column=7, padx=2)
         ttk.Button(frame_fecha_fin, text="📅", width=2, command=lambda: self.seleccionar_fecha(self.fecha_fin)).pack(side="right")
         
-        #ingreso fecha actual por defecto al abrir programa
+        #ingreso fecha de hoy por defecto al abrir programa
         hoy = datetime.now().strftime("%Y-%m-%d")
         self.fecha_inicio.insert(0, hoy)
         self.fecha_fin.insert(0, hoy)
@@ -457,7 +459,9 @@ class ReportesBasculaApp:
         # Espacio vacío para empujar los de respaldo
         btn_frame.grid_columnconfigure(3, weight=1)
         
+        # ==========================================================
         # Botones de copia de seguridad, impresion y restauracion
+        # ==========================================================
         
         # Botón copia de seguridad (misma columna que Consultar, fila siguiente)
         ttk.Button(btn_frame, text="Copia de seguridad", command=self.backup_base_datos).grid(row=0, column=3, padx=5, pady=5)
@@ -469,17 +473,42 @@ class ReportesBasculaApp:
         ttk.Button(btn_frame, text="Restaurar Copia Seguridad", command=self.restaurar_base_datos).grid(row=0, column=5, padx=5, pady=5, sticky="ew")
 
 
-        #ttk.Button(btn_frame, text="Copia de seguridad", command=self.backup_base_datos).grid(row=0, column=5, padx=5)
-        #ttk.Button(btn_frame, text="Restaurar Copia Seguridad", command=self.restaurar_base_datos).grid(row=0, column=6, padx=5)
+        self.datos_actuales = []  # Aquí se guardan los datos cargados 
+    
+    # ==========================================================
+    #  CONSTRUCTOR DE LA CLASE ReportesBasculaApp.
+    # ==========================================================
+    """
+    - Inicializa la ventana principal y todos los elementos de la interfaz gráfica:
+    - Configuración inicial de la ventana (título, tamaño).
+    - Creación de filtros de búsqueda (tipo de reporte, fechas, cliente, etc.).
+    - Configuración de botones de consulta y exportación (Excel, Access, PDF).
+    - Creación de la tabla Treeview con scrollbars para mostrar resultados.
+    - Definición de variables internas para manejo de datos.
+    """
+    def __init__(self, root):
+               
+        self.db_password = "bascula2025"  # guardo la contraseña de MySQL dentro de la clase para ser usada
+        
+        # Configuración inicial de la ventana principal
+        self.root = root
+        self.root.title("Consulta y Reportes - Báscula")
+        self.root.geometry("1300x650")  # Tamaño inicial de ventana
+        
+        # Esto fija tamaño 1300x650 y centra la ventana de inmediato
+        centrar_ventana(self.root, 1300, 650)
+        
+        
+        # === CREAR TODOS LOS WIDGETS DE LA INTERFAZ===
+        self.crear_widgets()
 
-
-        self.datos_actuales = []  # Aquí se guardan los datos cargados
 
 
      
     
     #funcion para ajustar las columnas
     def autoajustar_columnas(self, max_filas=200):
+        import tkinter.font as tkFont #para autoajustar las columnas
         filas = self.tree.get_children()[:max_filas]  # solo primeras 200 filas
         
         for col in self.tree["columns"]:
@@ -490,6 +519,7 @@ class ReportesBasculaApp:
 
     # === CONSULTA MYSQL ===
     def consultar(self):
+        import mysql.connector  # Conexión a MySQL
         tipo = self.tipo_reporte.get()
         fi = self.fecha_inicio.get()
         ff = self.fecha_fin.get()
@@ -639,18 +669,51 @@ class ReportesBasculaApp:
 
 
         else:
-            # Consulta de desconexiones
-            cursor.execute("""
-                SELECT * FROM desconexiones
-                WHERE fecha_hora BETWEEN %s AND %s
-                ORDER BY fecha_hora DESC
-            """, (fecha_inicio, fecha_fin))
+            # ==========================
+            # Consulta de desconexiones con nombre del autorizado
+            # ==========================
+            consulta = """
+                SELECT d.id_desconexion,
+                    d.fecha_hora,
+                    d.tipo_desconexion,
+                    d.descripcion,
+                    d.tiempo_desconexion,
+                    SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
+                FROM desconexiones d
+                LEFT JOIN personal_autorizado pa ON d.id_autorizado = pa.id_autorizado
+                WHERE d.fecha_hora BETWEEN %s AND %s
+                ORDER BY d.fecha_hora DESC
+            """
+            cursor.execute(consulta, (fecha_inicio, fecha_fin))
 
         resultados = cursor.fetchall()
         conn.close()
 
+  
+        # ==========================
+        # Formatear tiempo_desconexion (segundos -> HH:MM:SS)
+        # ==========================
+        if tipo == "desconexiones" and resultados:
+            datos_modificados = []
+            for fila in resultados:
+                fila_mod = dict(fila)
+                seg = fila_mod.get("tiempo_desconexion") or 0
+                try:
+                    seg = int(seg)
+                except:
+                    seg = 0
+                h = seg // 3600
+                m = (seg % 3600) // 60
+                s = seg % 60
+                fila_mod["tiempo_desconexion"] = f"{h:02}:{m:02}:{s:02}"  # ← mostrará 00:00:07 para 7 seg
+                datos_modificados.append(fila_mod)
+            resultados = datos_modificados
+        
 
-        # Mostrar resultados en la tabla
+        # ==========================
+        # Mostrar resultados en tabla
+        # ==========================
+
         # Limpiar Treeview
         self.tree.delete(*self.tree.get_children())
 
@@ -701,6 +764,7 @@ class ReportesBasculaApp:
 
     # === Exportación a EXCEL ===
     def exportar_excel(self):
+        import pandas as pd  # libreria para Manipulación de datos y exportación a Excel
         if not self.datos_actuales:
             messagebox.showerror("Error", "Primero consulta los datos.")
             return
@@ -717,9 +781,19 @@ class ReportesBasculaApp:
                 messagebox.showerror("Error", f"No se puede sobrescribir el archivo.\nAsegúrate de cerrarlo primero:\n{archivo}")
 
 
-   
+
+
+  
     # === Exportación a ACCESS ===
     def exportar_access(self):
+        import shutil
+        import pandas as pd # libreria para Manipulación de datos y exportación a Acces
+        
+        try:
+            import pyodbc #libreria para manejo archivos access
+        except ImportError:
+            pyodbc = None
+        
         if not self.datos_actuales:
             messagebox.showerror("Error", "Primero consulta los datos.")
             return
@@ -733,7 +807,7 @@ class ReportesBasculaApp:
 
         # Crear archivo vacío si no existe
         if not os.path.exists(archivo):
-            # Opción 1: copiar una base vacía de Access como plantilla
+            """# Opción 1: copiar una base vacía de Access como plantilla
             plantilla = r"C:\Windows\SysWOW64\msaccess.accdb"  # ejemplo
             if os.path.exists(plantilla):
                 shutil.copy(plantilla, archivo)
@@ -741,7 +815,8 @@ class ReportesBasculaApp:
                 # Opción 2: crear un archivo vacío (el driver lo acepta igual)
                 #open(archivo, "w").close()
                 if not os.path.exists(archivo):
-                    crear_base_access(archivo)
+                    crear_base_access(archivo)"""
+            crear_base_access(archivo)
 
         datos_export = self._preparar_datos_exportacion()
         df = pd.DataFrame(datos_export)
@@ -769,15 +844,38 @@ class ReportesBasculaApp:
 
             # Si la tabla no existe, crearla con las columnas del DataFrame
             columnas = df.columns
-            columnas_def = ", ".join([f"[{col}] TEXT" for col in columnas])
+            # Definir tipos de columnas: DOUBLE para números, TEXT para texto
+            columnas_def = []
+            for col in columnas:
+                if col.lower() in ["peso_bruto", "peso_tara", "peso_neto"]:
+                    columnas_def.append(f"[{col}] DOUBLE")
+                else:
+                    columnas_def.append(f"[{col}] TEXT")
+            columnas_def = ", ".join(columnas_def)
+
             cursor.execute(f"CREATE TABLE {tabla} ({columnas_def})")
 
             # Insertar filas
-            for _, fila in df.iterrows():
+            """for _, fila in df.iterrows():
                 placeholders = ", ".join(["?"] * len(fila))
                 cursor.execute(
                     f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({placeholders})",
                     tuple(str(x) for x in fila.values)
+                )"""
+            for _, fila in df.iterrows():
+                placeholders = ", ".join(["?"] * len(fila))
+                valores = []
+                for col, val in zip(columnas, fila.values):
+                    if col.lower() in ["peso_bruto", "peso_tara", "peso_neto"]:
+                        try:
+                            valores.append(float(val))  # aseguramos número
+                        except:
+                            valores.append(None)        # si viene vacío o inválido
+                    else:
+                        valores.append(str(val))        # el resto como texto
+                cursor.execute(
+                    f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({placeholders})",
+                    tuple(valores)
                 )
 
             conn.commit()
@@ -790,8 +888,18 @@ class ReportesBasculaApp:
             messagebox.showerror("Error", f"No se pudo exportar a Access.\n\nDetalles: {e}")
 
 
+
+
+    
+    
     # === Exportación a PDF con ajuste de ancho ===
     def exportar_pdf(self):
+        
+        import pandas as pd # libreria para Manipulación de datos y exportación a pdf
+        try:
+            from fpdf import FPDF # Importa FPDF si está disponible, para exportar a PDF
+        except ImportError:
+            FPDF = None
         if not self.datos_actuales:
             messagebox.showerror("Error", "Primero consulta los datos.")
             return
@@ -803,7 +911,7 @@ class ReportesBasculaApp:
         if archivo:
             pdf = FPDF(orientation="L", unit="mm", format="A4")  # Horizontal
             pdf.add_page()
-            pdf.set_font("Consolas", size=7)    
+            pdf.set_font("Courier", size=7)    
             
             datos_export = self._preparar_datos_exportacion()
             df = pd.DataFrame(datos_export)
@@ -857,12 +965,15 @@ class ReportesBasculaApp:
     
     # Funcion del boton de copia de seguridad de la base de datos            
     def backup_base_datos(self):
+        import shutil
+        import subprocess #importo subprocesos para realizar copias de seguridad de Mysql
         archivo = filedialog.asksaveasfilename(defaultextension=".sql", filetypes=[("SQL", "*.sql")])
         if not archivo:
             return
         
-        mysqldump_path = r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe"  # Ruta completa para evitar modificar path
-        
+        #mysqldump_path = r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe"  # Ruta completa para evitar modificar path
+        mysqldump_path = shutil.which("mysqldump") or r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe"
+
         # Verificar si el ejecutable existe
         if not os.path.isfile(mysqldump_path):
             messagebox.showerror("Error", f"No se encontró el ejecutable:\n{mysqldump_path}")
@@ -885,6 +996,7 @@ class ReportesBasculaApp:
     
     # Funcion del boton de Restauracion copia de seguridad de la base de datos
     def restaurar_base_datos(self):
+        import subprocess #importo subprocesos para realizar copias de seguridad de Mysql
         archivo = filedialog.askopenfilename(defaultextension=".sql", filetypes=[("SQL", "*.sql")])
         if not archivo:
             return

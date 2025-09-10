@@ -17,7 +17,7 @@ def conectar():
 # =======================
 
 def registrar_personal(nombre, login, password, cedula):
-
+    
     """
     Registra un nuevo usuario autorizado en la tabla personal_autorizado.
     """
@@ -29,15 +29,15 @@ def registrar_personal(nombre, login, password, cedula):
     """, (nombre, login, password, cedula))
     conexion.commit()
     conexion.close()
-    print(f"✅ Usuario {nombre} registrado con éxito.")
+    #print(f" Usuario {nombre} registrado con éxito.")
 
 
 def autenticar_usuario(login, password):
-
+    
     """
     Valida login y contraseña. Retorna diccionario con datos del usuario si existe.
     """
-
+    
     conexion = conectar()
     cursor = conexion.cursor(dictionary=True)
     cursor.execute("""
@@ -47,49 +47,54 @@ def autenticar_usuario(login, password):
     usuario = cursor.fetchone()
     conexion.close()
     if usuario:
-        print(f"✅ Usuario {usuario['nombre']} autenticado.")
+        #print(f" Usuario {usuario['nombre']} autenticado.")
+        pass
     else:
-        print("❌ Login o contraseña incorrectos.")
+        #print(" Login o contraseña incorrectos.")
+        pass
     return usuario
-
+   
 
 # =======================
 #  GESTIÓN DE EVENTOS
 # =======================
-def guardar_evento_desconexion(tipo):
-
+def guardar_evento_desconexion(tipo, tiempo_desconexion=0, id_autorizado=None):
+    
     """
-    Guarda un evento de desconexión en la tabla 'desconexiones'.
+    Guarda un evento de desconexión en la tabla 'desconexiones', incluyendo el tiempo de desconexión en segundos.
     """
-
+    
     try:
         conexion = conectar()
         cursor = conexion.cursor()
         cursor.execute("""
-            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion)
-            VALUES (%s, %s, %s)
+            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion, tiempo_desconexion, id_autorizado)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             datetime.now(),
             tipo,
-            f"Evento de desconexión detectado: {tipo}"
+            f"Evento de desconexión detectado: {tipo}",
+            tiempo_desconexion,
+            id_autorizado
         ))
         conexion.commit()
         conexion.close()
-        print("✅ Evento de desconexión guardado.")
+        #print(" Evento de desconexión guardado con {tiempo_desconexion} segundos.")
     except Exception as e:
-        print(f"❌ Error guardando desconexión: {e}")
-
-
+        #print(f" Error guardando desconexión: {e}")
+        pass
+        
+        
 # =======================
 # GESTIÓN DE CLIENTES Y PESAJE
 # =======================
 
 def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autorizado):
-
+    
     """
     Guarda un cliente (según tipo) y un pesaje relacionado, ligado al usuario autorizado.
     """
-
+    
     try:
         conexion = conectar()
         cursor = conexion.cursor()
@@ -133,11 +138,9 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
 
         peso_bruto = datos_pesaje.get("peso_bruto")
         peso_tara = datos_pesaje.get("peso_tara")
-        #peso_neto = None
         peso_neto = datos_pesaje.get("peso_neto")  # intenta usar el valor si ya existe
 
         if peso_neto is None and peso_bruto is not None and peso_tara is not None:
-        #if peso_bruto is not None and peso_tara is not None:
             peso_neto = abs(peso_bruto - peso_tara)
             
 
@@ -158,6 +161,7 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
 
         conexion.commit()
         conexion.close()
-        print("✅ Cliente y pesaje guardados con peso_neto.")
+        #print(" Cliente y pesaje guardados con peso_neto.")
     except Exception as e:
-        print(f"❌ Error guardando cliente y pesaje: {e}")
+        #print(f" Error guardando cliente y pesaje: {e}")
+        pass

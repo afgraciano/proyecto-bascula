@@ -9,7 +9,7 @@ conexion = mysql.connector.connect(
 
 cursor = conexion.cursor()
 cursor.execute("CREATE DATABASE IF NOT EXISTS bascula_silvotecnia")
-print("✅ Base de datos 'bascula_silvotecnia' creada.")
+#print(" Base de datos 'bascula_silvotecnia' creada.")
 
 conexion.database = "bascula_silvotecnia"
 
@@ -67,10 +67,18 @@ CREATE TABLE IF NOT EXISTS desconexiones (
     id_desconexion INT AUTO_INCREMENT PRIMARY KEY,
     fecha_hora DATETIME NOT NULL,
     tipo_desconexion VARCHAR(50),
-    descripcion VARCHAR(100)
-    
+    descripcion VARCHAR(100),
+    tiempo_desconexion INT DEFAULT 0   -- tiempo en segundos
 )
 ''')
+
+# Si ya existe la tabla, verificar y agregar columna tiempo_desconexion si falta
+cursor.execute("SHOW COLUMNS FROM desconexiones LIKE 'tiempo_desconexion'")
+columna = cursor.fetchone()
+if not columna:
+    cursor.execute("ALTER TABLE desconexiones ADD COLUMN tiempo_desconexion INT DEFAULT 0")
+    #print(" Columna tiempo_desconexion agregada a desconexiones.")
+
 
 
 # Tabla personal autorizado
@@ -93,13 +101,32 @@ if not columna:
     cursor.execute('''
     ALTER TABLE pesajes
     ADD COLUMN id_autorizado INT,
-    ADD CONSTRAINT fk_autorizado FOREIGN KEY (id_autorizado) REFERENCES personal_autorizado(id_autorizado)
+    ADD CONSTRAINT fk_pesajes_autorizado FOREIGN KEY (id_autorizado) REFERENCES personal_autorizado(id_autorizado)
     ''')
-    print("✅ Columna id_autorizado agregada a la tabla pesajes.")
+    #print(" Columna id_autorizado agregada a la tabla pesajes.")
 else:
-    print("ℹ️ La columna id_autorizado ya existe en pesajes.")
+    #print(" La columna id_autorizado ya existe en pesajes.")
+    pass
+    
+    
+
+# Verificar si la columna id_autorizado ya existe en desconexiones
+cursor.execute("SHOW COLUMNS FROM desconexiones LIKE 'id_autorizado'")
+columna = cursor.fetchone()
+
+if not columna:
+    cursor.execute('''
+    ALTER TABLE desconexiones
+    ADD COLUMN id_autorizado INT,
+    ADD CONSTRAINT fk_desconexiones_autorizado FOREIGN KEY (id_autorizado) REFERENCES personal_autorizado(id_autorizado)
+    ''')
+    #print(" Columna id_autorizado agregada a la tabla desconexiones.")
+else:
+    #print(" La columna id_autorizado ya existe en desconexiones.")
+    pass
     
     
 conexion.commit()
 conexion.close()
-print("✅ Todas las tablas fueron creadas correctamente.")
+#print(" Todas las tablas fueron creadas correctamente.")
+

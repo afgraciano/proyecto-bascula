@@ -38,6 +38,16 @@ RUTA_ESTADO_PESAJES = os.path.join(BASE_DIR, "estado_actual_pesajes.json")#archi
 RUTA_CONFIG = os.path.join(BASE_DIR, "config.py") #archivo de configuracion de puerto
 
 
+# Función para obtener usuario logueado
+def obtener_id_autorizado():
+    try:
+        with open(RUTA_USUARIO_ACTUAL, "r") as f:
+            data = json.load(f)
+            return data.get("id_autorizado")
+    except:
+        return None
+
+
 # Rutas de modulo3 según entorno
 MODULO3_EXE = os.path.join(BASE_DIR, "modulo3_servicio_unificado.exe")
 MODULO3_PY  = os.path.join(BASE_DIR, "modulo3_servicio_unificado.py")
@@ -52,13 +62,13 @@ root.withdraw()  # Ocultamos la raíz, solo se usa para manejar Toplevel()
 if not os.path.exists(RUTA_ESTADO_PESAJES):
     with open(RUTA_ESTADO_PESAJES, 'w') as f:
         json.dump({}, f)
-    print(f" Archivo creado: {RUTA_ESTADO_PESAJES}")
+    #print(f" Archivo creado: {RUTA_ESTADO_PESAJES}")
     
 # Crear archivo JSON de usuario logueado si no existe
 if not os.path.exists(RUTA_USUARIO_ACTUAL):
     with open(RUTA_USUARIO_ACTUAL, 'w') as f:
         json.dump({}, f)
-    print(f" Archivo creado: {RUTA_USUARIO_ACTUAL}")
+    #print(f" Archivo creado: {RUTA_USUARIO_ACTUAL}")
 
 # Estado de sesión / control de flujo
 peso_actual = 0
@@ -92,7 +102,7 @@ def matar_modulo3_abiertos():
             if proc.info["pid"] != actual_pid and "python" in proc.info["name"].lower():
                 # Si el proceso ejecuta modulo3, lo matamos
                 if any("modulo3_servicio_unificado.py" in str(c) for c in proc.info["cmdline"]):
-                    print(f" Cerrando módulo3 antiguo PID={proc.info['pid']}")
+                    #print(f" Cerrando módulo3 antiguo PID={proc.info['pid']}")
                     proc.kill()
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
@@ -143,22 +153,25 @@ def cerrar_todos_modulo3(timeout=2.0):
     """Intenta cerrar TODAS las instancias de modulo3 (no solo la lanzada por este proceso)."""
     procs = _procesos_modulo3_en_ejecucion()
     if not procs:
-        print(" No hay instancias de módulo3 para cerrar.")
+        #print(" No hay instancias de módulo3 para cerrar.")
         return
-    print(" Intentando cerrar módulo3, PIDs:", [p.pid for p in procs])
+    #print(" Intentando cerrar módulo3, PIDs:", [p.pid for p in procs])
     # terminate
     for p in procs:
         try: p.terminate()
-        except Exception as e: print(f"⚠️ terminate() falló PID {p.pid}: {e}")
+        except Exception as e: 
+            #print(f" terminate() falló PID {p.pid}: {e}")
+            pass
     _, vivos = psutil.wait_procs(procs, timeout=timeout)
     # kill si aún siguen
     if vivos:
         for p in vivos:
             try: 
-                print(f" Forzando kill() PID {p.pid}")
+                #print(f" Forzando kill() PID {p.pid}")
                 p.kill()
             except Exception as e:
-                print(f" kill() falló PID {p.pid}: {e}")
+                #print(f" kill() falló PID {p.pid}: {e}")
+                pass
 
 
 # =======================
@@ -176,7 +189,7 @@ def cargar_config():
             return cfg
         return None
     except Exception as e:
-        print(f"Error cargando config: {e}")
+        #print(f"Error cargando config: {e}")
         return None
 
 # Verifica si el puerto COM está disponible
@@ -193,14 +206,14 @@ def puerto_disponible(puerto):
 def esperar_configuracion():
    
     ultima_modificacion = os.path.getmtime(RUTA_CONFIG) if os.path.exists(RUTA_CONFIG) else 0
-    print("⚠ No se encontró un puerto válido. Abra ConfigBascula para configurarlo.")
+    #print(" No se encontró un puerto válido. Abra ConfigBascula para configurarlo.")
     while True:
         time.sleep(1)
         if os.path.exists(RUTA_CONFIG):
             nueva_modificacion = os.path.getmtime(RUTA_CONFIG)
             if nueva_modificacion != ultima_modificacion:
-                ultima_modificacion = nueva_modificacion  # 🔹 Actualizamos la referencia
-                print("✅ Se detectó cambio en config.py. Intentando reconectar...")
+                ultima_modificacion = nueva_modificacion  #  Actualizamos la referencia
+                #print(" Se detectó cambio en config.py. Intentando reconectar...")
                 return True
  
  
@@ -376,61 +389,157 @@ def desloguear_usuario(origen="Manual"):
 #  FUNCIONES VENTANAS
 # =======================
 
+# =============================
 # Ventana Alerta por desconexión
+# =============================
 class VentanaDesconexion:
     def __init__(self, root):
-        self.root = root
-        self.ventana = None
-        self.activa = False
+        self.root = root                 # Ventana raíz principal (Tk de la app)
+        self.ventana = None              # Ventana de desconexión (Toplevel)
+        self.activa = False              # Bandera para no abrirla más de una vez
+        self.inicio_desconexion = None   # Momento en que inició la desconexión
+        self.motivo_guardado = None      # Guardar solo el primer motivo presionado
+        self.contador_label = None       # Etiqueta que muestra el contador HH:MM:SS
+        self._update_job = None          # ID del after() para cancelar el contador
 
     def mostrar(self):
+        """Muestra la ventana de desconexión"""
         if self.activa:
-            return
+            return  # Evita abrir más de una
         self.activa = True
+        self.inicio_desconexion = datetime.now()  # Guardamos el inicio de la desconexión
+        self.motivo_guardado = None               # Reset motivo en cada desconexión
+
+        # Crear ventana secundaria
         self.ventana = tk.Toplevel(self.root)
-        self.ventana.withdraw()  #  Oculta la ventana antes de mostrarla
+        self.ventana.withdraw()  # Ocultar mientras se configura
         self.ventana.title("Desconexión de báscula")
         self.ventana.resizable(False, False)
-        self.ventana.attributes("-topmost", True)
+        self.ventana.attributes("-topmost", True)  # Siempre arriba
         self.ventana.lift()
         self.ventana.focus_force()
-        self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)
-        
-        # Centrar la ventana en la pantalla
-        centrar_ventana(self.ventana, 300, 170, margen_superior=200)  # Puedes ajustar el margen si quieres más arriba
+        self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)  # No permitir cerrar con X
 
-        # Crear contenido
-        tk.Label(self.ventana, text="Báscula desconectada.\nSeleccione la causa:", font=("Arial", 11)).pack(pady=10)
-        tk.Button(self.ventana, text="Corte de energía", width=25,
-                  command=lambda: self.cerrar("Corte de energía")).pack(pady=5)
-        
-        tk.Button(self.ventana, text="Desconexión de cable", width=25,
-                  command=lambda: self.cerrar("Desconexión de cable")).pack(pady=5)
-        # Cambiar usuario: llama directamente a desloguear_usuario()
-        tk.Button(self.ventana, text="Cambiar usuario",
-                  command=lambda: self.cerrar("Cambio de usuario autorizado")).pack(pady=5)
-        self.ventana.deiconify()  # Ahora sí mostrar centrada
-        
-   
-    def cerrar(self, motivo=None):
-        if motivo:
-            print(f" Usuario indicó: {motivo}")
-            guardar_evento_desconexion(motivo)
+        # Centrar la ventana en pantalla
+        centrar_ventana(self.ventana, 320, 300, margen_superior=200)
 
+        # Texto principal
+        tk.Label(
+            self.ventana,
+            text="⚠️ Báscula desconectada.\nSeleccione la causa:",
+            font=("Arial", 11)
+        ).pack(pady=10)
+
+        # Botones de causas
+        #boton corte energia
+        tk.Button(
+            self.ventana, text="Corte de energía", width=25,
+            command=lambda: self.registrar_motivo("Corte de energía")
+        ).pack(pady=5)
+        #boton desconexion cable
+        tk.Button(
+            self.ventana, text="Desconexión de cable", width=25,
+            command=lambda: self.registrar_motivo("Desconexión de cable")
+        ).pack(pady=5)
+        #boton cambio usuario
+        tk.Button(
+            self.ventana, text="Cambiar usuario", width=25,
+            command=lambda: self.registrar_motivo("Cambio de usuario autorizado")
+        ).pack(pady=5)
+        #boton configurar puerto
+        tk.Button(
+            self.ventana, text="Configurar puerto", width=25,
+            command=lambda: self.registrar_motivo("Configurar puerto")
+        ).pack(pady=5)
+
+        # Etiqueta contador
+        self.contador_label = tk.Label(self.ventana, text="⏱ Tiempo: 00:00:00", font=("Arial", 10))
+        self.contador_label.pack(pady=10)
+
+        # Mostrar ventana ya configurada
+        self.ventana.deiconify()
+        self._actualizar_contador()  # Iniciar contador en pantalla
+
+    def _actualizar_contador(self):
+        """Actualiza el contador HH:MM:SS cada segundo"""
+        if not self.activa or not self.ventana or not self.ventana.winfo_exists():
+            return  # Si la ventana ya no existe, no seguimos
+        if self.inicio_desconexion:
+            delta = datetime.now() - self.inicio_desconexion
+            segundos = int(delta.total_seconds())
+            horas, resto = divmod(segundos, 3600)
+            minutos, segundos = divmod(resto, 60)
+            # Mostrar tiempo formateado
+            self.contador_label.config(text=f"⏱ Tiempo: {horas:02}:{minutos:02}:{segundos:02}")
+        # Volver a llamar cada 1 segundo
+        self._update_job = self.ventana.after(1000, self._actualizar_contador)
+
+    def registrar_motivo(self, motivo):
+        """Registra solo el primer motivo elegido por el usuario"""
+        if not self.motivo_guardado:
+            self.motivo_guardado = motivo  # Guardamos el motivo
+            #print(f" Usuario indicó: {motivo}")  # Debug en consola
+
+            # Si es cambio de usuario, deslogueamos inmediatamente
+            if motivo == "Cambio de usuario autorizado":
+                desloguear_usuario("Desconexion")
+                
+            elif motivo == "Configurar puerto":
+                # Abrimos la lógica de configuración de puerto
+                self.ventana.destroy()
+                self.activa = False
+                esperar_configuracion()  # reutilizamos la función ya existente
+                return
+
+    def cerrar(self):
+        #Se ejecuta cuando la báscula vuelve a conectarse.
+        if self.inicio_desconexion:
+            delta = datetime.now() - self.inicio_desconexion
+            segundos = int(delta.total_seconds())  # Tiempo en segundos
+
+            if self.motivo_guardado:
+                #  Caso 1: El usuario presionó un botón → se guarda ese motivo
+                if self.motivo_guardado not in ("Configurar puerto",):
+                    guardar_evento_desconexion(self.motivo_guardado, tiempo_desconexion=segundos, id_autorizado=obtener_id_autorizado())
+
+            else:
+                #  Caso 2: No se presionó ningún botón → usamos el tipo de desconexión
+                if self.tipo_desconexion == "cable":
+                    guardar_evento_desconexion("Desconexión de cable", tiempo_desconexion=segundos, id_autorizado=obtener_id_autorizado())
+                elif self.tipo_desconexion == "sin_datos":
+                    guardar_evento_desconexion(
+                        "Posible generación de recibo manual", tiempo_desconexion=segundos, id_autorizado=obtener_id_autorizado())
+                else:
+                    #  Fallback de seguridad (por si no se definió tipo_desconexion)
+                    guardar_evento_desconexion("Desconexión sin motivo", tiempo_desconexion=segundos, id_autorizado=obtener_id_autorizado())
+                    
+
+        # Detener contador si está activo
+        if self._update_job and self.ventana:
+            self.ventana.after_cancel(self._update_job)
+            self._update_job = None
+
+        # Destruir ventana
         if self.ventana and self.ventana.winfo_exists():
             self.ventana.destroy()
-        self.activa = False
 
-        if motivo == "Cambio de usuario autorizado":
-            desloguear_usuario("Desconexion")
+        # Reset de variables internas para permitir próxima desconexión
+        self.activa = False
+        self.inicio_desconexion = None
+        self.motivo_guardado = None
+        self.tipo_desconexion = None # agregado: reseteamos también el tipo de desconexión
+        
 
     def verificar_estado(self):
+        """Asegura que la ventana no quede minimizada"""
         if self.ventana and self.ventana.winfo_exists():
-            if self.ventana.state() == 'iconic':
+            if self.ventana.state() == 'iconic':  # Si está minimizada
                 self.ventana.deiconify()
                 self.ventana.lift()
                 self.ventana.focus_force()
 
+             
+                
 # Ventana de alerta de sobrepeso no bloqueante
 class VentanaAlertaPeso:
     def __init__(self):
@@ -449,12 +558,12 @@ class VentanaAlertaPeso:
             self.ventana.protocol("WM_DELETE_WINDOW", lambda: None)
 
             tk.Label(self.ventana,
-                     text=f"⚠️ Peso actual: {peso} kg\nSupera los 80,000 kg",
+                     text=f" Peso actual: {peso} kg\nSupera los 80,000 kg",
                      font=("Arial", 12)).pack(pady=20)
 
     def cerrar(self):
         if self.ventana and self.ventana.winfo_exists():
-            print(" Cerrando ventana de peso excesivo")
+            #print(" Cerrando ventana de peso excesivo")
             self.ventana.destroy()
             self.ventana = None
             
@@ -470,33 +579,17 @@ def iniciar_socket():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))
         s.listen()
-        print(f" Servidor socket en {HOST}:{PORT}")
+        #print(f" Servidor socket en {HOST}:{PORT}")
         while True:
             conn, addr = s.accept()
             with conn:
                 now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 # usamos peso_actual local
                 respuesta = {"peso": peso_actual, "timestamp": now}
-                print(f"[SOCKET] Conexión desde {addr} -> enviando: {respuesta}")
+                #print(f"[SOCKET] Conexión desde {addr} -> enviando: {respuesta}")
                 conn.sendall(json.dumps(respuesta).encode())
                 
 
-
-"""def iniciar_socket():
-    global peso_actual
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("127.0.0.1", 5000))
-    server.listen()
-
-    print("Servidor socket en 127.0.0.1:5000")
-
-    while True:
-        conn, addr = server.accept()
-        with conn:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            respuesta = {"peso": peso_actual, "timestamp": now}
-            print(f"[SOCKET] {addr} -> {respuesta}")
-            conn.sendall(json.dumps(respuesta).encode())"""
 
 # =======================
 #  EJECUTAR / CERRAR MÓDULO 3
@@ -553,53 +646,60 @@ def proceso_activo(proceso):
 def verificar_peso():
     global peso_actual# vamos a actualizar la variable local con la global
     global ultimo_inicio_modulo3# vamos a actualizar la variable local con la global
+    global ser   # hacemos global para que reconectar pueda modificarlo
+    
     
     LOGOUT_EVENT.clear()
     
     cfg = cargar_config()    
+    
     if peso_actual is None:
         peso_actual = 0  # Evita error si el socket lo consulta antes de recibir datos
 
-    while not cfg or not hasattr(cfg, "PUERTO_CONFIGURADO") or not puerto_disponible(cfg.PUERTO_CONFIGURADO):
+    # =============================
+    # Espera hasta que haya puerto configurado y disponible
+    # =============================
+    
+    while not cfg or not hasattr(cfg, "PUERTO_CONFIGURADO"):
         if LOGOUT_EVENT.is_set():   # por si hacen logout aquí
             return
-        print("Puerto no configurado o no disponible.")
-        print("Abra ConfigBascula para establecer el puerto.")
-        #root_temp = tk.Tk()
-        #root_temp.withdraw()
-        messagebox.showwarning("Puerto no disponible", "Abra ConfigBascula para configurar el puerto.")
-        #root_temp.destroy()
+        messagebox.showwarning("Puerto no configurado", "Debe configurar el puerto en ConfigBascula.")
         esperar_configuracion()
         cfg = cargar_config()
         if peso_actual is None:
             peso_actual = 0
 
     PUERTO_ACTUAL = cfg.PUERTO_CONFIGURADO
-    print(f" Conectando a {PUERTO_ACTUAL}...")
+    #print(f" Conectando a {PUERTO_ACTUAL}...")
     
     ser = None # Inicializamos ser para evitar NameError si nunca se abre
     while True:
         if LOGOUT_EVENT.is_set():
             return
-        try:
+        try:            
+            # =============================
+            # Caso 2: puerto configurado pero no disponible
+            # =============================
             if not puerto_disponible(PUERTO_ACTUAL):
-                raise serial.SerialException("Puerto no disponible")
+                #print(f" Puerto {PUERTO_ACTUAL} no disponible en el sistema.")
+                # mostramos ventana de desconexión (no pedimos config de inmediato)
+                ventana_temp = VentanaDesconexion(root)
+                ventana_temp.tipo_desconexion = "cable"   # marcamos desconexión de cable
+                ventana_temp.mostrar()
+                ventana_temp.verificar_estado()
+                time.sleep(1)
+                continue
+
             ser = serial.Serial(PUERTO_ACTUAL, 9600, timeout=0.05)
             ser.reset_input_buffer()
-            print(f"Conectado a {PUERTO_ACTUAL}")
-            tiempo_sin_datos = 0  # 🔹 Reset tras conexión exitosa
+            #print(f" Conectado a {PUERTO_ACTUAL}")
             break
         except serial.SerialException:
-            print("Puerto no disponible, esperando reconfiguración...")
-            esperar_configuracion()
-            cfg = cargar_config()
-            if cfg and hasattr(cfg, "PUERTO_CONFIGURADO"):
-                PUERTO_ACTUAL = cfg.PUERTO_CONFIGURADO
+            #print("Puerto no disponible, esperando...")
+            time.sleep(1)
 
-    print(" Iniciando monitoreo de la báscula...")
+    #print(" Iniciando monitoreo de la báscula...")
 
-    #root = tk.Tk()
-    #root.withdraw()
     ventana_desconexion = VentanaDesconexion(root)
     ventana_alerta_peso = VentanaAlertaPeso()
     proceso_modulo3 = None  # inicializamos el proceso aquí
@@ -608,30 +708,44 @@ def verificar_peso():
     datos_validos_previos = 0
     esperando_datos = True
 
-    try:  # 🔹  protección para cierre seguro del puerto
+    try:  #  protección para cierre seguro del puerto
         #while True:
         while not LOGOUT_EVENT.is_set():
-            try:  # 🔹  evitar que un error de ventana mate el loop
-                # 🔹 MODIFICADO: mover root.update() fuera del flujo pesado, para que GUI responda siempre
+            
+            # =============================
+            # Mantener GUI responsiva
+            # =============================
+                # mover root.update() fuera del flujo pesado, para que GUI responda siempre
+            try:  # evitar que un error de ventana mate el loop
                 root.update_idletasks()
                 root.update()
             except tk.TclError:
                 pass
-            
+                      
             try:
+                # Validamos que ser no sea None antes de leer
+                if ser is None:
+                    time.sleep(0.1)
+                    continue
+                
                 raw_line = ser.readline()
                 if not raw_line:
                     tiempo_sin_datos += 1
                     if tiempo_sin_datos >= intervalo_reconexion:
-                        print(" Sin datos del COM.")
-                        ventana_alerta_peso.cerrar()  #  Cerramos alerta si no hay datos
-                        ventana_desconexion.mostrar()
+                        #print(" Sin datos del COM.")
+                        ventana_alerta_peso.cerrar()
+                        if not ventana_desconexion.activa:  #  solo si no está ya abierta
+                            ventana_desconexion.tipo_desconexion = "sin_datos"   #  marcamos falta de datos
+                            ventana_desconexion.mostrar()
                         ventana_desconexion.verificar_estado()
                 else:
+                    # =============================
+                    # Procesar datos recibidos
+                    # =============================
                     try:
                         linea = raw_line.decode('utf-8', errors='ignore').strip()
                     except Exception:
-                        print("Error de codificación en los datos recibidos.")
+                        #print("Error de codificación en los datos recibidos.")
                         tiempo_sin_datos += 1
                         continue
 
@@ -639,28 +753,38 @@ def verificar_peso():
                         # Esperar 2 lecturas válidas antes de procesar normalmente para evitar residuos fantasma del puerto com
                         if esperando_datos:
                             datos_validos_previos += 1
-                            print(f"Esperando datos válidos ({datos_validos_previos}/2): {linea}")
+                            #print(f"Esperando datos válidos ({datos_validos_previos}/2): {linea}")
                             if datos_validos_previos < 2:
                                 continue
                             else:
                                 esperando_datos = False                    
                         
                         tiempo_sin_datos = 0
-                        ventana_desconexion.cerrar()
-                        print(f"Peso recibido: {linea}")
+                        #  Si estaba activa la ventana de desconexión → cerramos y guardamos en BD
+                        if ventana_desconexion.activa:
+                            ventana_desconexion.cerrar()
+                            #print(" Evento de desconexión cerrado y guardado en BD.")
+
+                        #print(f"Peso recibido: {linea}")
                         match = re.search(r"[+-]\s*(\d+)\s*kg", linea)
                         if match:
                             peso = int(match.group(1))
                             peso_actual = peso   #  actualizamos la variable local
                             
-                                                  
+                            
+                            # =============================
+                            # Alerta de sobrepeso
+                            # =============================                      
                             #verificamos si el peso es mayor a 80 toneladas para abir aviso de sobrepeso
                             if peso >= 80000:
                                 ventana_alerta_peso.mostrar(peso)
                             else:
                                 ventana_alerta_peso.cerrar()
                             
+                            # =============================
                             # Verifica estado de pesajes / impresión
+                            # =============================
+
                             def hay_pesajes_abiertos():
                                 try:
                                     with open(RUTA_ESTADO_PESAJES, 'r') as f:
@@ -675,6 +799,9 @@ def verificar_peso():
                             
                             hay_pesaje_abierto = hay_pesajes_abiertos() or hay_impresion_Proceso()
                             
+                            # =============================
+                            # Reglas para abrir módulo3
+                            # =============================
                             # REGLAS PARA ABRIR MODULO 3 SI PESO>300 O JSON TIENE PESAJES ABIERTOS
                             # Control de tiempo mínimo entre lanzamientos para evitar parpadeo                            
                             TIEMPO_ESPERA_INICIO = 3 # segundos
@@ -683,17 +810,23 @@ def verificar_peso():
                                 if (not proceso_activo(proceso_modulo3)) and (tiempo_actual - ultimo_inicio_modulo3 > TIEMPO_ESPERA_INICIO):
                                     # En .exe validamos si ya hay una instancia corriendo ANTES de abrir otra
                                     if getattr(sys, 'frozen', False) and hay_modulo3_activo():
-                                        print("módulo3 ya está abierto (detectado con psutil), no se abre otro.")
+                                        #print("módulo3 ya está abierto (detectado con psutil), no se abre otro.")
+                                        pass
                                     else:
-                                        print(f"Activando módulo3 (peso={peso} kg, pesajes_abiertos={hay_pesaje_abierto})")
+                                        #print(f"Activando módulo3 (peso={peso} kg, pesajes_abiertos={hay_pesaje_abierto})")
                                         proceso_modulo3 = ejecutar_modulo3()
                                         ultimo_inicio_modulo3 = tiempo_actual
                                 else:
-                                    print("módulo3 ya está abierto o se inició hace poco, esperando...")
+                                    #print("módulo3 ya está abierto o se inició hace poco, esperando...")
+                                    pass
+                            # =============================
+                            # Reglas para cerrar módulo3
+                            # =============================
                             # solo cierra modulo3 si peso<10 y NO hay pesajes
                             elif peso < 10 and not hay_pesaje_abierto:
                                 if proceso_activo(proceso_modulo3) or (getattr(sys, 'frozen', False) and hay_modulo3_activo()):
-                                    print(" Cerrando módulo3 (peso < 10 kg y sin pesajes abiertos)")
+                                    #print(" Cerrando módulo3 (peso < 10 kg y sin pesajes abiertos)")
+                                    pass
                                     if getattr(sys, 'frozen', False):  
                                         cerrar_todos_modulo3(timeout=1.0)  # en exe, cerrar todas
                                     else:
@@ -701,47 +834,84 @@ def verificar_peso():
                                             proceso_modulo3.terminate()
                                             time.sleep(0.5)
                                             if proceso_activo(proceso_modulo3):
-                                                print("Terminate no fue suficiente, forzando kill()")
+                                                #print("Terminate no fue suficiente, forzando kill()")
                                                 proceso_modulo3.kill()
                                             else:
-                                                print("módulo3 cerrado correctamente")
+                                                #print("módulo3 cerrado correctamente")
+                                                pass
                                         except Exception as e:
-                                            print(f"Error al cerrar módulo3: {e}")
+                                            #print(f"Error al cerrar módulo3: {e}")
+                                            pass
                                     proceso_modulo3 = None
                                 else:
-                                    print(f" Peso bajo y sin pesajes abiertos ({peso} kg)")
+                                    #print(f" Peso bajo y sin pesajes abiertos ({peso} kg)")
+                                    pass
                     else:
                         tiempo_sin_datos += 1
                         if tiempo_sin_datos >= intervalo_reconexion:
                             ventana_desconexion.mostrar()
                             ventana_desconexion.verificar_estado()
-
+           
             except serial.SerialException:
-                print("Conexión perdida con el puerto.")
-                tiempo_sin_datos += 1
-                ventana_desconexion.mostrar()
+                # =============================
+                # Manejo de desconexión COM
+                # =============================
+                #print(" Conexión perdida con el puerto.")
+
+                if ser and ser.is_open:
+                    try:
+                        ser.close()
+                    except:
+                        pass
+                ser = None
+                
+                if not ventana_desconexion.activa:
+                    ventana_desconexion.tipo_desconexion = "cable" #  marcamos desconexión de cable
+                    ventana_desconexion.mostrar()
                 ventana_desconexion.verificar_estado()
 
-            if tiempo_sin_datos >= intervalo_reconexion:
-                ventana_desconexion.mostrar()
-                ventana_desconexion.verificar_estado()
+                # Intentar reconexión sin bloquear
+                def intentar_reconexion():
+                    global ser
+                    if LOGOUT_EVENT.is_set():
+                        return
+                    try:
+                        if puerto_disponible(PUERTO_ACTUAL):
+                            ser = serial.Serial(PUERTO_ACTUAL, 9600, timeout=0.05)
+                            ser.reset_input_buffer()
+                            #print(f" Reconectado a {PUERTO_ACTUAL}")
+                            if ventana_desconexion.activa:
+                                ventana_desconexion.cerrar() # Aquí se guarda el evento de desconexión
+                            return
+                    except Exception as e:
+                        #print(f" Esperando reconexión... {e}")
+                        pass
+                    root.after(1000, intentar_reconexion)
 
+                root.after(1000, intentar_reconexion)
+
+
+                
+            # =============================
             # Revisar si módulo3 pidió cambio de usuario y lo cerrarmos
+            # =============================
+            
             
             if os.path.exists(FLAG_CAMBIO_USUARIO):
-                print(" Solicitud de cambio de usuario recibida desde módulo3.")
+                #print(" Solicitud de cambio de usuario recibida desde módulo3.")
                 try:
                     os.remove(FLAG_CAMBIO_USUARIO)
                 except: 
                     pass
                  # Guardamos evento en la base de datos
                 try:
-                    guardar_evento_desconexion("Cambio de usuario autorizado")
-                    print(" Evento de cambio de usuario registrado en la BD.")
+                    guardar_evento_desconexion("Cambio de usuario autorizado", id_autorizado=obtener_id_autorizado())
+                    #print(" Evento de cambio de usuario registrado en la BD.")
                 except Exception as e:
-                    print(f" Error al guardar evento de desconexión (cambio usuario): {e}")
+                    #print(f" Error al guardar evento de desconexión (cambio usuario): {e}")
+                    pass
 
-                # 🔹 Cerramos sesión / matamos módulo3
+                #  Cerramos sesión / matamos módulo3
                 desloguear_usuario("Cambio desde módulo3")
 
             
@@ -760,20 +930,10 @@ def verificar_peso():
         try:
             cerrar_todos_modulo3(timeout=1.0)  # Asegura que no queden instancias vivas de módulo3
         except Exception as e:
-            print(f"Error cerrando módulo3 en finally: {e}")
+            #print(f"Error cerrando módulo3 en finally: {e}")
+            pass
 
 # Inicia servidor socket y monitoreo
-"""if __name__ == "__main__":
-    threading.Thread(target=iniciar_socket, daemon=True).start()
-    mostrar_login()   #  Login obligatorio antes de todo. Esto bloquea hasta que se loguee el usuario
-    verificar_peso()"""
-
-"""if __name__ == "__main__":
-    threading.Thread(target=iniciar_socket, daemon=True).start()
-    mostrar_login()   # crea la ventana de login
-    root.mainloop()   # mantiene la interfaz viva hasta que cierre login
-    #verificar_peso()  # se ejecuta solo después de login exitoso y destroy()
-    """
 
 # =======================
 #  MAIN LOOP
@@ -785,13 +945,14 @@ if __name__ == "__main__":
     
     # Hook para cierre limpio de la ventana principal
     def salir_seguro():
-        print(" Cerrando aplicación: matando todos los módulo3...")
+        #print(" Cerrando aplicación: matando todos los módulo3...")
         try:
             cerrar_todos_modulo3(timeout=1.0)
         except Exception as e:
-            print(f"Error cerrando módulo3 en salida: {e}")
+            #print(f"Error cerrando módulo3 en salida: {e}")
+            pass
         root.destroy()
-        os._exit(0)  # 🔹 mata hilos residuales (socket, etc.)
+        os._exit(0)  # mata hilos residuales (socket, etc.)
 
     root.protocol("WM_DELETE_WINDOW", salir_seguro)
 

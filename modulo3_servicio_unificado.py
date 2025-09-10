@@ -18,7 +18,7 @@ import win32ui
 from estado_pesajes import pesajes_temporales, pesajes_confirmados
 import json
 import os #realizar operaciones sobre sistema operativo (comprueba archivo existe, elimina archivos, crea carpetas, accede path del sistema, etc.)
-import sys   # 🟢 NECESARIO para detectar si corre en .py o .exe
+import sys   #  NECESARIO para detectar si corre en .py o .exe
 
 from integracion_mysql import guardar_cliente_y_pesaje # importacion para la base de datos
 
@@ -29,7 +29,7 @@ ventanas_tiquete_abiertas = []
 
 
 # Detectar carpeta real, tanto en .py como en .exe
-if getattr(sys, 'frozen', False):
+if getattr(sys, 'frozen', False):  
     BASE_DIR = os.path.dirname(sys.executable)
 else:
     BASE_DIR = os.path.dirname(__file__)
@@ -69,7 +69,7 @@ def obtener_usuario_actual():
             return json.load(f)
     except:
         return None
-
+    
 
 
 
@@ -89,7 +89,7 @@ def imprimir_tiquete(texto, impresora=None):
         if not impresora:
             messagebox.showerror("Error de impresión", "No hay una impresora predeterminada configurada en Windows.")
             return
-
+        
         hprinter = win32print.OpenPrinter(impresora)
         try:
             hdc = win32ui.CreateDC()
@@ -130,7 +130,7 @@ def imprimir_tiquete(texto, impresora=None):
                 y += line_spacing
 
             y += line_spacing  # espacio extra antes del contenido
-
+                    
             #aqui comienza titulo de la impresion
             # --- Fuente para el título ---
             """fuente_titulo = win32ui.CreateFont({
@@ -164,7 +164,7 @@ def imprimir_tiquete(texto, impresora=None):
 
     except Exception as e:
         messagebox.showerror("Error de impresión", f"Ocurrió un error inesperado:\n{e}")
-
+            
 
 
 """
@@ -397,17 +397,18 @@ def actualizar_estado_pesajes():
                 pesajes_temporales[clave] = (peso, fecha)
                 
 
-# 🔁 Cargar estado anterior desde archivo JSON (al iniciar)
+#  Cargar estado anterior desde archivo JSON (al iniciar)
 def cargar_estado_pesajes():
     try:
-        with open(RUTA_ESTADO_PESAJES, 'r') as f:   # 🟢 CAMBIO: uso de ruta absoluta
+        with open(RUTA_ESTADO_PESAJES, 'r') as f:   #  CAMBIO: uso de ruta absoluta
             datos = json.load(f)
             pesajes_temporales.update(datos)
     except Exception as e:
-        print(f"⚠️ No se pudo restaurar estado de pesajes: {e}")
+        #print(f" No se pudo restaurar estado de pesajes: {e}")
+        pass
 
 
-# 🟢 Llamar esta función cargar_estado_pesajes inmediatamente después de definirla
+#  Llamar esta función cargar_estado_pesajes inmediatamente después de definirla
 cargar_estado_pesajes()
 
 
@@ -424,7 +425,7 @@ cargar_estado_pesajes()
             return peso, resultado.get("timestamp", "")
     except:
         return 0, ""
-"""
+""" 
 def obtener_datos_peso():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -438,13 +439,13 @@ def obtener_datos_peso():
                     break
                 data += parte
             if not data:
-                print("[ERROR] obtener_datos_peso: no se recibió data del socket")
+                #print("[ERROR] obtener_datos_peso: no se recibió data del socket")
                 return 0, ""
             resultado = json.loads(data.decode())
             peso = resultado.get("peso", 0) or 0
             return peso, resultado.get("timestamp", "")
     except Exception as e:
-        print(f"[ERROR] obtener_datos_peso: {e}")
+        #print(f"[ERROR] obtener_datos_peso: {e}")
         return 0, ""
 
 
@@ -515,7 +516,7 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     
     #ventana.geometry("722x668")  # 👈 abre la ventana principal servicio bascula al abrir el formulario
     centrar_ventana(ventana, 1022, 668, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
-
+    
     # 🔁 Asegura que el frame esté visible incluso si fue ocultado con .pack_forget()
     frame_formulario.pack(pady=10, fill="x")
        
@@ -649,14 +650,14 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         
         
         
-        # 🔁 Construimos el ID y clave si todo esta bien
+        #  Construimos el ID y clave si todo esta bien
         id_ingresado = f"{placa} {empresa_sel}{remision}".strip().upper()
         clave = f"{tipo}:{id_ingresado}".strip()
         
         
         #adquiero de la variable global el peso antes capturado
         global peso_capturado_global
-        print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
+        #print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
         peso = peso_capturado_global
 
 
@@ -716,7 +717,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
     # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
       
     # 📌 Si el pesaje ya fue iniciado → es un cierre manual
-    if clave in estado and tipo in ["Inmuniza", "Aserrio"]:
+    if clave in estado and tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
         def cerrar_con_peso(peso_final):
             fecha_inicial = estado[clave]["fecha_hora_entrada"]
             peso_inicial = estado[clave]["peso_entrada"]
@@ -728,11 +729,11 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             peso_tara = min(peso_inicial, peso_final)
 
             from integracion_mysql import guardar_cliente_y_pesaje
-
+            
             # Obtener usuario autorizado actual
             usuario = obtener_usuario_actual()
             id_aut = usuario["id_autorizado"] if usuario else None
-
+            
             guardar_cliente_y_pesaje(
                 tipo_cliente="interno",
                 datos_cliente=datos_empresa,
@@ -769,7 +770,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             )
             mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
             
-            #cerrar_proceso_impresion()
+
             actualizar_estado_pesajes() # ✅ actualiza JSON en memoria
             
             if refrescar_tabla_pesajes:
@@ -788,13 +789,13 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         return
 
     # 🟢 NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
-    if tipo in ["Inmuniza", "Aserrio"]:
+    if tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado"]:
         fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+        
         # Obtener usuario autorizado actual
         usuario = obtener_usuario_actual()
         id_aut = usuario["id_autorizado"] if usuario else None
-
+        
         estado[clave] = {
             "tipo": tipo,
             "id": id_ingresado,
@@ -821,44 +822,78 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         if refrescar_tabla_pesajes:
             refrescar_tabla_pesajes()
 
-    # 🟣 ASTILLABLE (solo imprime, no guarda en json pero si en Mysql)
+
+    # 🟣 ASTILLABLE: preguntar si tendrá cierre (igual que en mensuales)
     elif tipo == "Astillable":
+        cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio Astillable tendrá cierre de pesaje?", parent=ventana)
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
-        from integracion_mysql import guardar_cliente_y_pesaje
 
-        # Obtener usuario autorizado actual
-        usuario = obtener_usuario_actual()
-        id_aut = usuario["id_autorizado"] if usuario else None
+        if cerrar:
+            # PESAJE INICIAL (con cierre posterior)
+            usuario = obtener_usuario_actual()
+            id_aut = usuario["id_autorizado"] if usuario else None
 
-        guardar_cliente_y_pesaje(
-            tipo_cliente="interno",
-            
-            datos_cliente=datos_empresa,
-            datos_pesaje={
-                "peso_bruto": peso,
-                "peso_tara": 0,
-                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
-                "peso_neto": peso # neto = bruto si no hay tara
-            },
-            id_autorizado=id_aut
-        )
-        # 🔼 FIN BLOQUE GUARDADO EN MYSQL
-        
-        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
-        contenido = (
-            f"{encabezado}"
-            f"Pesaje único registrado.\n"
-            f"{tipo}:\n"
-            f"ID: {id_ingresado}\n"
-            f"Peso: {peso:.2f} kg\n"
-            f"Fecha: {fecha_actual}"
-        )
-        mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
+            estado[clave] = {
+                "tipo": tipo,
+                "id": id_ingresado,
+                "peso_entrada": peso,
+                "fecha_hora_entrada": fecha_actual,
+                "id_autorizado": id_aut
+            }
+            with open(archivo_estado, "w") as file:
+                json.dump(estado, file, indent=4)
 
+            encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje inicial registrado.\n"
+                f"{tipo}:\n"
+                f"ID: {id_ingresado}\n"
+                f"Peso Inicial: {peso:.2f} kg\n"
+                f"Fecha Inicial: {fecha_actual}"
+            )
+            mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
 
-    #  Limpieza visual del formulario después de completar (usando función dedicada)
+            actualizar_estado_pesajes()
+            if refrescar_tabla_pesajes:
+                refrescar_tabla_pesajes()
+
+        else:
+            # PESAJE ÚNICO (sin cierre posterior, directo a MySQL)
+            # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+            from integracion_mysql import guardar_cliente_y_pesaje
+
+            # Obtener usuario autorizado actual
+            usuario = obtener_usuario_actual()
+            id_aut = usuario["id_autorizado"] if usuario else None
+
+            guardar_cliente_y_pesaje(
+                tipo_cliente="interno",
+
+                datos_cliente=datos_empresa,
+                datos_pesaje={
+                    "peso_bruto": peso,
+                    "peso_tara": 0,
+                    "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                    "peso_neto": peso # neto = bruto si no hay tara
+                },
+                id_autorizado=id_aut
+            )
+            # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+
+            encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje único registrado.\n"
+                f"{tipo}:\n"
+                f"ID: {id_ingresado}\n"
+                f"Peso: {peso:.2f} kg\n"
+                f"Fecha: {fecha_actual}"
+            )
+            mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
+
+   
+    # Limpieza visual del formulario después de completar (usando función dedicada)
     if limpiar_formulario_unicamente:
         limpiar_formulario_unicamente()
         centrar_ventana(ventana, 1022, 529, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
@@ -880,7 +915,7 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
     
     #ventana.geometry("722x668")  #  abre la ventana principal servicio bascula al abrir el formulario
     centrar_ventana(ventana, 1022, 668, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
-
+    
     #  Asegura que el frame esté visible incluso si fue ocultado
     frame_formulario.pack(pady=10, fill="x")
     
@@ -974,7 +1009,7 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
             messagebox.showerror("Error", "La remisión solo puede contener letras, números y espacios.", parent=ventana)
             return
         #validacion de remision2
-        # ✅ Si NO hay remisión, preguntar si desea continuar sin ella
+        #  Si NO hay remisión, preguntar si desea continuar sin ella
         if not remision:
             continuar = messagebox.askyesno("¿Sin remisión?", "No se ingresó remisión.\n¿Desea continuar sin ella?", parent=ventana)
             if not continuar:
@@ -982,15 +1017,15 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
                 return
         
         
-        # 🔁 Construimos el ID y clave si todo esta bien
+        #  Construimos el ID y clave si todo esta bien
         id_ingresado = f"{placa} {remision}".strip()# ← Si no hay remisión, queda solo la placa
         clave = f"{tipo}:{cliente_nombre}:{id_ingresado}".strip()
         
         #adquiero de la variable global el peso antes capturado
         global peso_capturado_global
-        print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
+        #print(f"[DEBUG] peso_capturado_global al confirmar formulario: {peso_capturado_global}")
         peso = peso_capturado_global
-        print(f"[DEBUG] peso_capturado_global al confirmar formulario igualando peso: {peso_capturado_global}")
+        #print(f"[DEBUG] peso_capturado_global al confirmar formulario igualando peso: {peso_capturado_global}")
 
 
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
@@ -1070,11 +1105,11 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         peso_tara = min(peso_inicial, peso_final)
 
         from integracion_mysql import guardar_cliente_y_pesaje
-
+        
         # Obtener usuario autorizado actual
         usuario = obtener_usuario_actual()
         id_aut = usuario["id_autorizado"] if usuario else None
-
+        
         guardar_cliente_y_pesaje(
             tipo_cliente="mensual",
             datos_cliente=datos_empresa,
@@ -1099,7 +1134,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         contenido = (
             f"{encabezado}"
             f"Pesaje cerrado:\n"
-            f"{tipo}:\n"
+            #f"{tipo}:\n"
+            f"Mensual:\n"
             f"ID: {id_ingresado}\n"
             f"Peso Inicial: {peso_inicial:.2f} kg\n"
             f"Fecha Inicial: {fecha_inicial}\n"
@@ -1123,11 +1159,11 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
 
     if cerrar:
         # PESAJE INICIAL (con cierre posterior)
-
+        
         # Obtener usuario autorizado actual
         usuario = obtener_usuario_actual()
         id_aut = usuario["id_autorizado"] if usuario else None
-
+        
         estado[clave] = {
             "tipo": tipo,
             "id": id_ingresado,
@@ -1144,7 +1180,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         contenido = (
             f"{encabezado}"
             f"Pesaje inicial registrado:\n"
-            f"{tipo}:\n"
+            #f"{tipo}:\n"
+            f"Mensual:\n"
             f"ID: {id_ingresado}\n"
             f"Peso Inicial: {peso:.2f} kg\n"
             f"Fecha Inicial: {fecha_actual}"
@@ -1170,7 +1207,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         # Obtener usuario autorizado actual
         usuario = obtener_usuario_actual()
         id_aut = usuario["id_autorizado"] if usuario else None
-
+        
         guardar_cliente_y_pesaje(
             tipo_cliente="mensual",
             datos_cliente=datos_empresa,
@@ -1192,7 +1229,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         limpiar_formulario_unicamente()
         #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
         centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
-
+        
         
 # --------------------------------------------------------------------
 # FORMULARIO EMBEBIDO PARA CLIENTES EXTERNOS DE PAGO INMEDIATO
@@ -1342,7 +1379,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             return
 
         id_ingresado = f"{placa} {remision}".strip()
-        # 🔑 Clave completa usada para identificar pesajes únicos
+        #  Clave completa usada para identificar pesajes únicos
         # Incluye: tipo, cliente, placa, remisión (opcional), razón social y NIT
         # Esto garantiza que no se confundan pesajes con la misma placa pero diferente empresa o persona
         clave = f"{tipo}:{cliente_nombre}:{id_ingresado}:{razon}:{nit}".strip()
@@ -1350,9 +1387,9 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 
         global peso_capturado_global
         peso = peso_capturado_global
-        print(f"[DEBUG] peso_capturado_global al confirmar formulario TERCERO: {peso}")
+        #print(f"[DEBUG] peso_capturado_global al confirmar formulario TERCERO: {peso}")
 
-        # 🟡 Si ya hay pesaje iniciado → hacer cierre automático sin preguntar por inicio
+        #  Si ya hay pesaje iniciado → hacer cierre automático sin preguntar por inicio
         try:
             #with open("estado_actual_pesajes.json", "r") as file:
             with open(RUTA_ESTADO_PESAJES, "r") as file:
@@ -1360,7 +1397,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
         except FileNotFoundError:
             estado = {}
             
-        # 🔍 Buscar si ya existe un pesaje con misma placa, remisión, razon y nit
+        #  Buscar si ya existe un pesaje con misma placa, remisión, razon y nit
         clave_existente = None
         for k, v in estado.items():
             if k.startswith(f"{tipo}:{cliente_nombre}:{id_ingresado}") and v.get("razon") == razon and v.get("nit") == nit:
@@ -1388,15 +1425,15 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 
             # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (CIERRE AUTOMÁTICO)
             from integracion_mysql import guardar_cliente_y_pesaje
-
-            # Determinar pesos
+            
+            # Determinar pesos            
             peso_bruto = max(peso_ini, peso_final)
             peso_tara = min(peso_ini, peso_final)
-
+            
             # Obtener usuario autorizado actual
             usuario = obtener_usuario_actual()
             id_aut = usuario["id_autorizado"] if usuario else None
-
+            
             guardar_cliente_y_pesaje(
                 tipo_cliente="tercero",
                 datos_cliente={
@@ -1447,11 +1484,11 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 
         if cerrar:
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+            
             # Obtener usuario autorizado actual
             usuario = obtener_usuario_actual()
             id_aut = usuario["id_autorizado"] if usuario else None
-
+            
             estado[clave] = {
                 "tipo": tipo,
                 "id": id_ingresado,
@@ -1491,11 +1528,11 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             
             # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
             from integracion_mysql import guardar_cliente_y_pesaje
-
+            
             # Obtener usuario autorizado actual
             usuario = obtener_usuario_actual()
             id_aut = usuario["id_autorizado"] if usuario else None
-
+            
             guardar_cliente_y_pesaje(
                 tipo_cliente="tercero",
                 datos_cliente={
@@ -1545,7 +1582,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 # Función principal que construye y ejecuta la ventana de servicio del módulo 3, crea la interfaz del módulo
 def modulo_servicio():
     
-    # 🔁 Si el archivo puntero quedó por error de una sesión anterior, lo eliminamos
+    #  Si el archivo puntero quedó por error de una sesión anterior, lo eliminamos
     if os.path.exists(".proceso_impresion_activo"):
         os.remove(".proceso_impresion_activo")
     
@@ -1556,12 +1593,12 @@ def modulo_servicio():
         
         # Siempre capturamos el peso actual al presionar un botón principal en variable global
         global peso_capturado_global
-        print(f"[DEBUG] peso_capturado_global al presionar botones principales: {peso_capturado_global}")
+        #print(f"[DEBUG] peso_capturado_global al presionar botones principales: {peso_capturado_global}")
         peso_capturado_global, _ = obtener_datos_peso()
-        print(f"[DEBUG] peso_capturado_global al obtener datos de peso {peso_capturado_global}")
+        #print(f"[DEBUG] peso_capturado_global al obtener datos de peso {peso_capturado_global}")
         if peso_capturado_global is None:
             peso_capturado_global = 0
-            print(f"[DEBUG] peso_capturado_global al obtener datos de peso si es none{peso_capturado_global}")
+            #print(f"[DEBUG] peso_capturado_global al obtener datos de peso si es none{peso_capturado_global}")
  
  
  
@@ -1587,8 +1624,8 @@ def modulo_servicio():
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
             # comportamiento para Tercero (pago inmediato)
 
-        # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
-        elif tipo in ["Inmuniza", "Aserrio", "Astillable"]:
+        # Si es Inmuniza, Aserrio o Astillable Seleccionado, se necesita un ID y se hace lógica de pesaje doble. si es Astillable solo logica de Externos (Mensuales)
+        elif tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
             mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente)
             return
 
@@ -1610,9 +1647,10 @@ def modulo_servicio():
         if ventanas_tiquete_abiertas:
             messagebox.showinfo("Impresión activa", "Cierra primero todas las ventanas de impresión antes de salir.", parent=ventana)
             return
-        print("📌 Sesión de pesajes confirmados:")
+        #print(" Sesión de pesajes confirmados:")
         for tipo, id_, p_ini, p_fin, f_ini, f_fin in pesajes_confirmados:
-            print(f"→ Tipo: {tipo}, ID: {id_}, Peso Neto: {p_fin - p_ini:.2f} kg, De: {f_ini} a {f_fin}")
+            #print(f"→ Tipo: {tipo}, ID: {id_}, Peso Neto: {p_fin - p_ini:.2f} kg, De: {f_ini} a {f_fin}")
+            pass
         ventana.destroy() # Cierra la ventana completamente
  
     ventana.protocol("WM_DELETE_WINDOW", al_cerrar)  # Asocia el cierre de ventana al manejo manual
@@ -1687,7 +1725,7 @@ def modulo_servicio():
     #tree.column("clave", width=300)
     #tree.column("peso", anchor="center")
     #tree.column("fecha", anchor="center")
-
+    
     tree.column("clave", width=500, anchor="w")   # más ancha y alineada a la izquierda
     tree.column("peso", width=100, anchor="center")  # más angosta
     tree.column("fecha", width=100, anchor="center") # tamaño intermedio
@@ -1804,14 +1842,14 @@ def modulo_servicio():
             contenido = (
                 f"{encabezado}"
                 f"Pesaje inicial registrado:\n"
-                f"Externo:\n"
+                f"Mensual:\n"
                 f"ID: {datos.get('id','')}\n"
                 f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
                 f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}"
             )
 
-        # 3) Internos (Aserrio / Inmuniza) — intentar inferir RG / MS del ID
-        elif tipo in ("Aserrio", "Inmuniza"):
+        # 3) Internos (Aserrio / Inmuniza /Astillable Seleccionado /Astillable) — intentar inferir RG / MS del ID
+        elif tipo in ("Aserrio", "Inmuniza","Astillable Seleccionado", "Astillable"):
             id_val = datos.get("id", "")
             # Buscar código RG o MS en el id (maneja formatos como "ABC RG123" o "ABC MS123")
             m = re.search(r'\b(RG|MS)\b', id_val)
@@ -1914,7 +1952,7 @@ def modulo_servicio():
                 f.write("1")
 
             verificar_servicio(tipo) #funcion para capturar peso actual en variable global
-
+                        
             centrar_ventana(ventana, 1022, 680, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
             
             # Limpiar y mostrar botones de cliente
@@ -1957,18 +1995,19 @@ def modulo_servicio():
     
     
     # Creacion 4 botones principales
-    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable"]
+    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable Seleccionado", "Astillable"]
     for tipo in tipos:
-        tk.Button(frame_botones, text=tipo, width=10, font=("Arial", 9),
+        ancho = 20 if tipo == "Astillable Seleccionado" else 10 #ancho para todos botones en 10 excepto Astillable Seleccionado que va en 20
+        tk.Button(frame_botones, text=tipo, width=ancho, font=("Arial", 9),
                 command=lambda t=tipo: manejar_servicio(t)).pack(side="left", padx=5)
-
-
+        
+        
     # Botón para cambiar usuario
-    btn_cambiar_usuario = tk.Button(frame_botones, text="Cambiar Usuario", width=12, font=("Arial", 9),
+    btn_cambiar_usuario = tk.Button(frame_botones, text="Cambiar Usuario", width=15, font=("Arial", 9),
                                     bg="orange", command=solicitar_cambio_usuario)
     btn_cambiar_usuario.pack(side="right", padx=5)
-
-
+ 
+ 
     #  Contenedor reservado para los formularios embebidos
     # Esto asegura que siempre aparezca debajo de los botones principales
     frame_formulario = tk.Frame(ventana)
@@ -1990,7 +2029,7 @@ if __name__ == "__main__":
     import sys
 
     def cerrar_gracioso(sig, frame):
-        print("🔴 Señal de terminación recibida. Cerrando ventana de báscula...")
+        #print("Señal de terminación recibida. Cerrando ventana de báscula...")
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, cerrar_gracioso)
@@ -1999,4 +2038,5 @@ if __name__ == "__main__":
     try:
         modulo_servicio()
     except Exception as e:
-        print(f"⛔ módulo3 cerrado por excepción: {e}")
+        #print(f"módulo3 cerrado por excepción: {e}")
+        pass
