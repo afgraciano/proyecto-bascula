@@ -4,6 +4,8 @@ python -m pip install --upgrade pip
 
 pip install pywin32
 
+pip install psutil
+
 este se ejecuta en setup comand promp del com0com
 install PortName=COM6 PortName=COM7
 
@@ -18,4 +20,5 @@ pip install tabulate
 pip install pandas openpyxl fpdf pyodbc
 pip install tkcalendar
 pip install pyinstaller
+
 

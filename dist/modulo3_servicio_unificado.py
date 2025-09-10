@@ -18,7 +18,7 @@ import win32ui
 from estado_pesajes import pesajes_temporales, pesajes_confirmados
 import json
 import os #realizar operaciones sobre sistema operativo (comprueba archivo existe, elimina archivos, crea carpetas, accede path del sistema, etc.)
-import sys   # 🟢 NECESARIO para detectar si corre en .py o .exe
+import sys   #  NECESARIO para detectar si corre en .py o .exe
 
 from integracion_mysql import guardar_cliente_y_pesaje # importacion para la base de datos
 
@@ -716,7 +716,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
     # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
       
     # 📌 Si el pesaje ya fue iniciado → es un cierre manual
-    if clave in estado and tipo in ["Inmuniza", "Aserrio"]:
+    if clave in estado and tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
         def cerrar_con_peso(peso_final):
             fecha_inicial = estado[clave]["fecha_hora_entrada"]
             peso_inicial = estado[clave]["peso_entrada"]
@@ -769,7 +769,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             )
             mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
             
-            #cerrar_proceso_impresion()
+            
             actualizar_estado_pesajes() # ✅ actualiza JSON en memoria
             
             if refrescar_tabla_pesajes:
@@ -788,7 +788,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         return
 
     # 🟢 NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
-    if tipo in ["Inmuniza", "Aserrio"]:
+    if tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado"]:
         fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Obtener usuario autorizado actual
@@ -821,44 +821,78 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         if refrescar_tabla_pesajes:
             refrescar_tabla_pesajes()
 
-    # 🟣 ASTILLABLE (solo imprime, no guarda en json pero si en Mysql)
+
+    # 🟣 ASTILLABLE: preguntar si tendrá cierre (igual que en mensuales)
     elif tipo == "Astillable":
+        cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio Astillable tendrá cierre de pesaje?", parent=ventana)
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
-        from integracion_mysql import guardar_cliente_y_pesaje
-        
-        # Obtener usuario autorizado actual
-        usuario = obtener_usuario_actual()
-        id_aut = usuario["id_autorizado"] if usuario else None
-        
-        guardar_cliente_y_pesaje(
-            tipo_cliente="interno",
+
+        if cerrar:
+            # PESAJE INICIAL (con cierre posterior)
+            usuario = obtener_usuario_actual()
+            id_aut = usuario["id_autorizado"] if usuario else None
+
+            estado[clave] = {
+                "tipo": tipo,
+                "id": id_ingresado,
+                "peso_entrada": peso,
+                "fecha_hora_entrada": fecha_actual,
+                "id_autorizado": id_aut
+            }
+            with open(archivo_estado, "w") as file:
+                json.dump(estado, file, indent=4)
+
+            encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje inicial registrado.\n"
+                f"{tipo}:\n"
+                f"ID: {id_ingresado}\n"
+                f"Peso Inicial: {peso:.2f} kg\n"
+                f"Fecha Inicial: {fecha_actual}"
+            )
+            mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
+
+            actualizar_estado_pesajes()
+            if refrescar_tabla_pesajes:
+                refrescar_tabla_pesajes()
+
+        else:
+            # PESAJE ÚNICO (sin cierre posterior, directo a MySQL)
+            # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+            from integracion_mysql import guardar_cliente_y_pesaje
             
-            datos_cliente=datos_empresa,
-            datos_pesaje={
-                "peso_bruto": peso,
-                "peso_tara": 0,
-                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
-                "peso_neto": peso # neto = bruto si no hay tara
-            },
-            id_autorizado=id_aut
-        )
-        # 🔼 FIN BLOQUE GUARDADO EN MYSQL
-        
-        encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
-        contenido = (
-            f"{encabezado}"
-            f"Pesaje único registrado.\n"
-            f"{tipo}:\n"
-            f"ID: {id_ingresado}\n"
-            f"Peso: {peso:.2f} kg\n"
-            f"Fecha: {fecha_actual}"
-        )
-        mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
+            # Obtener usuario autorizado actual
+            usuario = obtener_usuario_actual()
+            id_aut = usuario["id_autorizado"] if usuario else None
+            
+            guardar_cliente_y_pesaje(
+                tipo_cliente="interno",
+                
+                datos_cliente=datos_empresa,
+                datos_pesaje={
+                    "peso_bruto": peso,
+                    "peso_tara": 0,
+                    "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                    "peso_neto": peso # neto = bruto si no hay tara
+                },
+                id_autorizado=id_aut
+            )
+            # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+            
+            encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
+            contenido = (
+                f"{encabezado}"
+                f"Pesaje único registrado.\n"
+                f"{tipo}:\n"
+                f"ID: {id_ingresado}\n"
+                f"Peso: {peso:.2f} kg\n"
+                f"Fecha: {fecha_actual}"
+            )
+            mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
    
-    #  Limpieza visual del formulario después de completar (usando función dedicada)
+    # Limpieza visual del formulario después de completar (usando función dedicada)
     if limpiar_formulario_unicamente:
         limpiar_formulario_unicamente()
         centrar_ventana(ventana, 1022, 529, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
@@ -1099,7 +1133,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         contenido = (
             f"{encabezado}"
             f"Pesaje cerrado:\n"
-            f"{tipo}:\n"
+            #f"{tipo}:\n"
+            f"Mensual:\n"
             f"ID: {id_ingresado}\n"
             f"Peso Inicial: {peso_inicial:.2f} kg\n"
             f"Fecha Inicial: {fecha_inicial}\n"
@@ -1144,7 +1179,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         contenido = (
             f"{encabezado}"
             f"Pesaje inicial registrado:\n"
-            f"{tipo}:\n"
+            #f"{tipo}:\n"
+            f"Mensual:\n"
             f"ID: {id_ingresado}\n"
             f"Peso Inicial: {peso:.2f} kg\n"
             f"Fecha Inicial: {fecha_actual}"
@@ -1587,8 +1623,8 @@ def modulo_servicio():
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
             # comportamiento para Tercero (pago inmediato)
 
-        # Si es Inmuniza o Aserrio, se necesita un ID y se hace lógica de pesaje doble
-        elif tipo in ["Inmuniza", "Aserrio", "Astillable"]:
+        # Si es Inmuniza, Aserrio o Astillable Seleccionado, se necesita un ID y se hace lógica de pesaje doble. si es Astillable solo logica de Externos (Mensuales)
+        elif tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
             mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente)
             return
 
@@ -1804,14 +1840,14 @@ def modulo_servicio():
             contenido = (
                 f"{encabezado}"
                 f"Pesaje inicial registrado:\n"
-                f"Externo:\n"
+                f"Mensual:\n"
                 f"ID: {datos.get('id','')}\n"
                 f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
                 f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}"
             )
 
-        # 3) Internos (Aserrio / Inmuniza) — intentar inferir RG / MS del ID
-        elif tipo in ("Aserrio", "Inmuniza"):
+        # 3) Internos (Aserrio / Inmuniza /Astillable Seleccionado /Astillable) — intentar inferir RG / MS del ID
+        elif tipo in ("Aserrio", "Inmuniza","Astillable Seleccionado", "Astillable"):
             id_val = datos.get("id", "")
             # Buscar código RG o MS en el id (maneja formatos como "ABC RG123" o "ABC MS123")
             m = re.search(r'\b(RG|MS)\b', id_val)
@@ -1957,14 +1993,15 @@ def modulo_servicio():
     
     
     # Creacion 4 botones principales
-    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable"]
+    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable Seleccionado", "Astillable"]
     for tipo in tipos:
-        tk.Button(frame_botones, text=tipo, width=10, font=("Arial", 9),
+        ancho = 20 if tipo == "Astillable Seleccionado" else 10 #ancho para todos botones en 10 excepto Astillable Seleccionado que va en 20
+        tk.Button(frame_botones, text=tipo, width=ancho, font=("Arial", 9),
                 command=lambda t=tipo: manejar_servicio(t)).pack(side="left", padx=5)
         
         
     # Botón para cambiar usuario
-    btn_cambiar_usuario = tk.Button(frame_botones, text="Cambiar Usuario", width=12, font=("Arial", 9),
+    btn_cambiar_usuario = tk.Button(frame_botones, text="Cambiar Usuario", width=15, font=("Arial", 9),
                                     bg="orange", command=solicitar_cambio_usuario)
     btn_cambiar_usuario.pack(side="right", padx=5)
  

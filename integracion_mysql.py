@@ -56,28 +56,30 @@ def autenticar_usuario(login, password):
 # =======================
 #  GESTIÓN DE EVENTOS
 # =======================
-def guardar_evento_desconexion(tipo):
+def guardar_evento_desconexion(tipo, tiempo_desconexion=0, id_autorizado=None):
     
     """
-    Guarda un evento de desconexión en la tabla 'desconexiones'.
+    Guarda un evento de desconexión en la tabla 'desconexiones', incluyendo el tiempo de desconexión en segundos.
     """
     
     try:
         conexion = conectar()
         cursor = conexion.cursor()
         cursor.execute("""
-            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion)
-            VALUES (%s, %s, %s)
+            INSERT INTO desconexiones (fecha_hora, tipo_desconexion, descripcion, tiempo_desconexion, id_autorizado)
+            VALUES (%s, %s, %s, %s, %s)
         """, (
             datetime.now(),
             tipo,
-            f"Evento de desconexión detectado: {tipo}"
+            f"Evento de desconexión detectado: {tipo}",
+            tiempo_desconexion,
+            id_autorizado
         ))
         conexion.commit()
         conexion.close()
-        print("✅ Evento de desconexión guardado.")
+        print("✅ Evento de desconexión guardado con {tiempo_desconexion} segundos.")
     except Exception as e:
-        print(f"❌ Error guardando desconexión: {e}")
+        print(f" Error guardando desconexión: {e}")
         
         
 # =======================
