@@ -1,10 +1,10 @@
 {
-    "Externo:Tercero (pago inmediato):ASD654 123:Gilberto Hinestroza:789456123": {
+    "Externo:Tercero (pago inmediato):ASD654 123:Esta Es La Prueba:789456123": {
         "tipo": "Externo",
         "id": "ASD654 123",
         "peso_entrada": 2700,
         "fecha_hora_entrada": "2025-08-26 20:03:31",
-        "razon": "Gilberto Hinestroza",
+        "razon": "Esta Es La Prueba",
         "nit": "789456123",
         "correo": "gilberto@hotmail.com"
     },
@@ -28,5 +28,12 @@
         "razon": "Andres",
         "nit": "71375473",
         "correo": "ag@gmail.com"
+    },
+    "Astillable:KKY168 MS123": {
+        "tipo": "Astillable",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-10 01:45:20",
+        "id_autorizado": 1
     }
 }

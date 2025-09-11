@@ -36,7 +36,7 @@ REM ================================
 REM Ejecutable de reportes (ReporteBascula.exe)
 REM ================================
 del /q *.spec 2>nul
-pyinstaller --onefile --noconsole --clean --noconfirm ^
+pyinstaller --onedir --noconsole --clean --noconfirm ^
 --exclude-module gssapi ^
 --exclude-module spnego ^
 --name ReporteBascula ^
