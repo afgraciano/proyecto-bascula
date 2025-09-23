@@ -1,3 +1,33 @@
+"""
+modulo1_lector_unificado.py
+
+Módulo principal encargado de:
+- Conectar con la balanza vía puerto serie (RS-232 / COM).
+- Mantener monitor de peso en tiempo real.
+- Detectar desconexiones y registrar eventos.
+- Lanzar/cerrar el `modulo3_servicio_unificado` (exe o py) según reglas de negocio.
+- Servir el peso actual por socket (127.0.0.1:5000) en formato JSON.
+
+Archivos usados:
+- usuario_actual.json : {"id_autorizado":..., "nombre":..., "login":...}
+- estado_actual_pesajes.json : { <clave_pesaje>: {...} }
+
+Punteros/flags:
+- .proceso_impresion_activo : si existe, impide logout.
+- .cambiar_usuario.flag : solicita cambio de usuario desde modulo3.
+
+Dependencias externas:
+- pyserial, psutil, tkinter, integracion_mysql (funciones: autenticar_usuario, registrar_personal, guardar_evento_desconexion)
+
+Formato esperado de líneas serie:
+- Ejemplo válido: "+ 12345 kg" o "- 678 kg"
+- El parser busca el patrón r"[+-]\s*(\d+)\s*kg"
+
+Notas de operación:
+- Umbrales y tiempos: mover a config.py (PESO_ALERTA=80000, PESO_ARRANQUE=300, PESO_APAGADO=10, ...)
+"""
+
+
 import serial
 import importlib
 import time
@@ -30,13 +60,17 @@ else:
 
 usuario_actual = None  # guardará el usuario logueado
 
-#Direccionamiento de archivos
-ARCHIVO_PUNTERO_IMPRESION = ".proceso_impresion_activo"# archivo puntero para bloquear logout en impresión
+#Rutas y archivos de control usados por el módulo: Direccionamiento de archivos
+ARCHIVO_PUNTERO_IMPRESION = ".proceso_impresion_activo"# archivo puntero indica impresión activa (evita logout)
 FLAG_CAMBIO_USUARIO = os.path.join(BASE_DIR, ".cambiar_usuario.flag")# archivo puntero para pedir cambio usuario
 RUTA_USUARIO_ACTUAL = os.path.join(BASE_DIR, "usuario_actual.json") #archivo json con usuario logueado
 RUTA_ESTADO_PESAJES = os.path.join(BASE_DIR, "estado_actual_pesajes.json")#archivo json con pesajes iniciados
 RUTA_CONFIG = os.path.join(BASE_DIR, "config.py") #archivo de configuracion de puerto
 
+
+###Lee y devuelve el campo 'id_autorizado' almacenado en RUTA_USUARIO_ACTUAL.
+##Devuelve None si el archivo no existe o no contiene el campo.
+##Se usa para asociar eventos (desconexión, cambio de usuario) al usuario logueado.
 
 # Función para obtener usuario logueado
 def obtener_id_autorizado():
@@ -107,7 +141,7 @@ def matar_modulo3_abiertos():
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
 
-"""Devuelve lista de psutil.Process que corresponden a modulo3 (exe o py) en este mismo directorio."""
+#Devuelve lista de psutil.Process que corresponden a modulo3 (exe o py) en este mismo directorio.
 def _procesos_modulo3_en_ejecucion():
     procs = []
     frozen = getattr(sys, 'frozen', False)
@@ -149,8 +183,9 @@ def _procesos_modulo3_en_ejecucion():
 def hay_modulo3_activo():
     return len(_procesos_modulo3_en_ejecucion()) > 0
 
+#Intenta cerrar TODAS las instancias de modulo3 (no solo la lanzada por este proceso).
 def cerrar_todos_modulo3(timeout=2.0):
-    """Intenta cerrar TODAS las instancias de modulo3 (no solo la lanzada por este proceso)."""
+    
     procs = _procesos_modulo3_en_ejecucion()
     if not procs:
         #print(" No hay instancias de módulo3 para cerrar.")
@@ -222,7 +257,7 @@ def esperar_configuracion():
 #  LOGIN (BLOQUEANTE)
 # =======================
 #funcion para Ventana de login obligatoria. Hasta que no se loguee el usuario no se abre nada más.
-#def mostrar_login():
+
 def mostrar_login_bloqueante():
     global usuario_actual
     usuario_actual = None  # limpia usuario previo
@@ -235,13 +270,13 @@ def mostrar_login_bloqueante():
     # Mantener ventana al frente
     ventana.attributes("-topmost", True)
     ventana.lift()
-    ventana.focus_force()
+    ventana.focus_force()# Foco inicial en login
     
     # --- Campos ---
     tk.Label(ventana, text="Login:").pack(pady=2)
     entry_login = tk.Entry(ventana)
     entry_login.pack()
-    #entry_login.focus_set()   # 🔹 Foco inicial en login
+    
 
     tk.Label(ventana, text="Contraseña:").pack(pady=2)
     entry_pass = tk.Entry(ventana, show="*")
@@ -300,7 +335,7 @@ def mostrar_login_bloqueante():
     entry_login.bind("<Return>", focus_password)  # Enter en login → pasa a contraseña
     entry_pass.bind("<Return>", submit_login)     # Enter en pass → login directo
 
-    # 🔹 Foco inicial garantizado (después de dibujar la ventana)
+    # Foco inicial garantizado (después de dibujar la ventana)
     ventana.after(100, lambda: entry_login.focus_set())
     
     ventana.protocol("WM_DELETE_WINDOW", lambda: None)  # Bloquea cerrar con la X
@@ -411,8 +446,8 @@ class VentanaDesconexion:
         self.contador_label = None       # Etiqueta que muestra el contador HH:MM:SS
         self._update_job = None          # ID del after() para cancelar el contador
 
-    def mostrar(self):
-        """Muestra la ventana de desconexión"""
+    #Muestra la ventana de desconexión
+    def mostrar(self):        
         if self.activa:
             return  # Evita abrir más de una
         self.activa = True
@@ -469,8 +504,8 @@ class VentanaDesconexion:
         self.ventana.deiconify()
         self._actualizar_contador()  # Iniciar contador en pantalla
 
-    def _actualizar_contador(self):
-        """Actualiza el contador HH:MM:SS cada segundo"""
+    #Actualiza el contador HH:MM:SS cada segundo
+    def _actualizar_contador(self):        
         if not self.activa or not self.ventana or not self.ventana.winfo_exists():
             return  # Si la ventana ya no existe, no seguimos
         if self.inicio_desconexion:
@@ -483,8 +518,8 @@ class VentanaDesconexion:
         # Volver a llamar cada 1 segundo
         self._update_job = self.ventana.after(1000, self._actualizar_contador)
 
-    def registrar_motivo(self, motivo):
-        """Registra solo el primer motivo elegido por el usuario"""
+    # Registra solo el primer motivo elegido por el usuario"""
+    def registrar_motivo(self, motivo):        
         if not self.motivo_guardado:
             self.motivo_guardado = motivo  # Guardamos el motivo
             #print(f" Usuario indicó: {motivo}")  # Debug en consola
@@ -538,16 +573,14 @@ class VentanaDesconexion:
         self.motivo_guardado = None
         self.tipo_desconexion = None # agregado: reseteamos también el tipo de desconexión
         
-
-    def verificar_estado(self):
-        """Asegura que la ventana no quede minimizada"""
+#Asegura que la ventana no quede minimizada
+    def verificar_estado(self):        
         if self.ventana and self.ventana.winfo_exists():
             if self.ventana.state() == 'iconic':  # Si está minimizada
                 self.ventana.deiconify()
                 self.ventana.lift()
                 self.ventana.focus_force()
 
-             
                 
 # Ventana de alerta de sobrepeso no bloqueante
 class VentanaAlertaPeso:

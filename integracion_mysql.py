@@ -1,3 +1,25 @@
+"""
+integracion_mysql.py
+
+Módulo de integración con la base de datos MySQL para el sistema de pesaje.
+
+Funciones principales:
+- Conectar a la base de datos `bascula_silvotecnia` usando mysql.connector.
+- Gestión de usuarios autorizados:
+  * Registrar nuevos usuarios en la tabla personal_autorizado.
+  * Autenticar usuarios por login y contraseña.
+- Gestión de eventos:
+  * Guardar desconexiones de báscula en la tabla desconexiones,
+    incluyendo fecha, tipo, descripción, duración e id_autorizado.
+- Gestión de clientes y pesajes:
+  * Registrar clientes de tipo externo inmediato (tercero), mensual o interno.
+  * Insertar datos de pesaje asociados (bruto, tara, neto, placa, id_cliente, id_autorizado).
+  * Cálculo automático de peso neto si no se proporciona.
+  
+Notas:
+- Todas las operaciones abren y cierran conexión a la base de datos de forma independiente.
+- Se manejan excepciones silenciosamente (se recomienda agregar logging para producción).
+"""
 # Contenido del archivo con funciones de integración
 import mysql.connector
 from datetime import datetime

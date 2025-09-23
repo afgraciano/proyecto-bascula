@@ -29,15 +29,5 @@
         "peso_entrada": 0,
         "fecha_hora_entrada": "2025-09-09 23:30:17",
         "id_autorizado": 2
-    },
-    "Externo:Tercero (pago inmediato):ABC123 456:Andres Felipe Graciano Monsalve:71375739": {
-        "tipo": "Externo",
-        "id": "ABC123 456",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-09-18 17:20:47",
-        "razon": "Andres Felipe Graciano Monsalve",
-        "nit": "71375739",
-        "correo": "",
-        "id_autorizado": 2
     }
 }

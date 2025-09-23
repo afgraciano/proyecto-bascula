@@ -1,4 +1,21 @@
-# modulo2_configuracion.py
+"""
+modulo2_config.py
+
+Módulo gráfico para configurar el puerto COM de la báscula.
+
+Funcionalidad principal:
+- Mostrar ventana Tkinter con lista de posibles puertos (COM1 a COM10).
+- Permitir seleccionar un puerto y guardarlo en un archivo config.py.
+- Almacenar además la fecha y hora de la configuración.
+- Validar que se seleccione un puerto antes de guardar.
+
+Archivos generados:
+- config.py : contiene constantes PUERTO_CONFIGURADO y FECHA_CONFIGURACION.
+
+Modo de ejecución:
+- Puede usarse como script independiente.
+- En modo 'frozen' (ejecutable) detecta el directorio real del .exe para ubicar config.py.
+"""
 
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -15,8 +32,8 @@ def guardar_puerto_config(puerto):
         base_dir = os.path.dirname(__file__)
 
     ruta_config = os.path.join(base_dir, 'config.py')
-    #ruta_config = os.path.join(os.path.dirname(__file__), 'config.py')
     try:
+        # Abrir config.py en modo escritura (se sobrescribe en cada configuración)
         with open(ruta_config, 'w') as f:
             f.write(f'PUERTO_CONFIGURADO = "{puerto}"\n')
             f.write(f'FECHA_CONFIGURACION = "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"\n')

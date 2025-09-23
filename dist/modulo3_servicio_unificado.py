@@ -1,10 +1,34 @@
+"""
+modulo3_servicio_unificado.py
+
+Módulo gráfico de servicio para la gestión de pesajes.
+
+Funciones principales:
+- Interfaz gráfica (Tkinter) para registrar, consultar e imprimir pesajes.
+- Comunicación con el módulo 1 vía socket TCP (127.0.0.1:5000) para obtener el peso en tiempo real.
+- Registro de entradas y salidas de vehículos con almacenamiento en MySQL.
+- Manejo de clientes externos (inmediatos o mensuales) e internos (Aserrio, Inmuniza, Astillable).
+- Asociación de pesajes al usuario autorizado en sesión (archivo usuario_actual.json).
+- Generación e impresión de tiquetes con encabezado, cliente, empresa y datos del pesaje.
+- Consulta y visualización de reportes desde la GUI.
+- Control de punteros/archivos de estado:
+  * estado_actual_pesajes.json : mantiene lista de pesajes abiertos.
+  * .proceso_impresion_activo : indica si hay impresión en curso (bloquea logout).
+  * .cambiar_usuario.flag : permite forzar cierre de sesión desde la GUI.
+- Integración con la base de datos MySQL para registrar pesajes y eventos.
+
+Notas de operación:
+- Diseñado para ejecutarse en paralelo con el módulo 1, que alimenta el peso en tiempo real.
+- El ciclo principal se mantiene activo mientras el operador use la interfaz.
+- Al cerrar, libera recursos y guarda el estado actual de pesajes.
+"""
 # Importación de módulos necesarios
 import tkinter as tk  # Módulo principal para la GUI Para interfaces gráficas
 from tkinter import ttk  # Módulo para widgets avanzados (Treeview, Combobox, etc.)
 from tkinter import simpledialog, messagebox  # Para cuadros de diálogo simples y mensajes emergentes
 import socket  # Para la comunicación con el módulo que lee el peso (modulo1) Comunicación por red local (localhost)
 import json  # Para interpretar los datos recibidos en formato JSON
-from datetime import datetime  # 🗓️ Usado Para Obtener y registrar fecha y hora exacta del pesaje
+from datetime import datetime  # Usado Para Obtener y registrar fecha y hora exacta del pesaje
 import re  # Validaciones con expresiones regulares
 import unicodedata  # para permitir caracteres o validación de nombres acentuados
 
@@ -119,7 +143,7 @@ def imprimir_tiquete(texto, impresora=None):
                 "weight": 900
             })
             hdc.SelectObject(fuente_titulo)
-            #hdc.SelectObject(fuente)
+           
 
             y = 50
             line_spacing = int(font_size * 1.5)
@@ -132,15 +156,7 @@ def imprimir_tiquete(texto, impresora=None):
             y += line_spacing  # espacio extra antes del contenido
                     
             #aqui comienza titulo de la impresion
-            # --- Fuente para el título ---
-            """fuente_titulo = win32ui.CreateFont({
-                "name": "Consolas",
-                "height": font_size + 8,  # más grande que el texto normal
-                "weight": 900             # negrita fuerte
-            })
-            hdc.SelectObject(fuente_titulo)"""
-
-            # --- Volver a fuente normal ---
+            # fuente normal ---
             fuente_normal = win32ui.CreateFont({
                 "name": "Consolas",
                 "height": font_size + 3,
@@ -172,63 +188,6 @@ def imprimir_tiquete(texto, impresora=None):
             
 
 
-"""
-#defino funcion para imprimir tiquete adaptada a Epson TM-U220D
-def imprimir_tiquete(texto, impresora=None):
-    if impresora is None:
-        impresora = win32print.GetDefaultPrinter()
-
-    hprinter = win32print.OpenPrinter(impresora)
-    try:
-        hdc = win32ui.CreateDC()
-        hdc.CreatePrinterDC(impresora)
-
-        # 📏 Tamaños fijos optimizados para Epson TM-U220D
-        font_size_normal = 22   # Texto normal
-        font_size_titulo = 28   # Encabezado
-
-        hdc.StartDoc("Tiquete Báscula")
-        hdc.StartPage()
-
-        # --- Fuente para el título ---
-        fuente_titulo = win32ui.CreateFont({
-            "name": "Consolas",
-            "height": font_size_titulo,
-            "weight": 900  # Negrita fuerte
-        })
-        hdc.SelectObject(fuente_titulo)
-
-        y = 50
-        line_spacing = int(font_size_titulo * 1.5)
-
-        # --- Agregar título fijo arriba desde variable global ---
-        for linea_titulo in ENCABEZADO_TIQUETE.strip().split("\n"):
-            hdc.TextOut(50, y, linea_titulo)
-            y += line_spacing
-
-        y += line_spacing  # espacio extra antes del contenido
-
-        # --- Fuente normal para el contenido ---
-        fuente_normal = win32ui.CreateFont({
-            "name": "Consolas",
-            "height": font_size_normal,
-            "weight": 700
-        })
-        hdc.SelectObject(fuente_normal)
-
-        line_spacing = int(font_size_normal * 1.5)
-        for linea in texto.split("\n"):
-            hdc.TextOut(50, y, linea)
-            y += line_spacing
-
-        hdc.EndPage()
-        hdc.EndDoc()
-        hdc.DeleteDC()
-
-    finally:
-        win32print.ClosePrinter(hprinter)
-
-"""
 
 
 #defino funcion para mostrar tiquete con impresion para que salga el mensaje a imprimir adaptable
@@ -236,7 +195,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana = tk.Toplevel()
     ventana.title(titulo)
     #ventana.geometry("410x500")
-    centrar_ventana(ventana, 410, 500, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
+    centrar_ventana(ventana, 410, 500, margen_superior=50)  # Restaura tamaño original y centrar ventana original
     ventana.resizable(False, False)
     ventana.attributes("-topmost", True)
     
@@ -248,7 +207,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     text_area = tk.Text(ventana, wrap="word", font=("Consolas", 10))
     text_area.pack(expand=True, fill="both", padx=10, pady=10)
     
-    # ✅ Insertar el encabezado global antes del contenido
+    #  Insertar el encabezado global antes del contenido
     texto_completo = ENCABEZADO_TIQUETE + contenido
     text_area.insert("1.0", texto_completo)
     
@@ -259,7 +218,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     frame_botones.pack(pady=10)
 
     def imprimir_default():
-        imprimir_tiquete(contenido)# ⚠ Aquí podrías usar texto_completo si quieres que incluya el encabezado siempre
+        imprimir_tiquete(contenido)# Aquí podrías usar texto_completo si quieres que incluya el encabezado siempre
 
     def seleccionar_e_imprimir():
         sub = tk.Toplevel()
@@ -291,7 +250,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
         if ventana in ventanas_tiquete_abiertas:
             ventanas_tiquete_abiertas.remove(ventana)
         if not ventanas_tiquete_abiertas:
-            cerrar_proceso_impresion()  # ✅ se elimina .proceso_impresion_activo
+            cerrar_proceso_impresion()  # se elimina .proceso_impresion_activo
         ventana.destroy()
 
 
@@ -303,82 +262,10 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
 
 
-"""
-#defino funcion para mostrar tiquete con impresion para que salga el mensaje a imprimir como saldria en la epson
-def mostrar_tiquete_con_impresion(titulo, contenido):
-    ventana = tk.Toplevel()
-    ventana.title(titulo)
-    centrar_ventana(ventana, 410, 500, margen_superior=50)  
-    ventana.resizable(False, False)
-    ventana.attributes("-topmost", True)
-
-    # Registrar la ventana activa
-    ventanas_tiquete_abiertas.append(ventana)
-
-    # 📏 Tamaños optimizados como la impresora Epson TM-U220D
-    font_size_titulo_preview = 12  # Aproximadamente similar a 28 en impresión
-    font_size_normal_preview = 10  # Aproximadamente similar a 22 en impresión
-
-    # Área de texto
-    text_area = tk.Text(ventana, wrap="word", font=("Consolas", font_size_normal_preview))
-    text_area.pack(expand=True, fill="both", padx=10, pady=10)
-
-    # Encabezado
-    text_area.insert("1.0", ENCABEZADO_TIQUETE)
-    text_area.tag_add("titulo", "1.0", "4.0")
-    text_area.tag_config("titulo", font=("Consolas", font_size_titulo_preview, "bold"))
-
-    # Contenido debajo del encabezado
-    text_area.insert("end", contenido)
-    text_area.config(state="disabled")
-
-    frame_botones = tk.Frame(ventana)
-    frame_botones.pack(pady=10)
-
-    def imprimir_default():
-        imprimir_tiquete(contenido)  # Usa la función adaptada de impresión
-
-    def seleccionar_e_imprimir():
-        sub = tk.Toplevel()
-        sub.title("Seleccionar impresora")
-        sub.geometry("400x150")
-        sub.resizable(False, False)
-        sub.attributes("-topmost", True)
-
-        tk.Label(sub, text="Seleccione una impresora instalada:", font=("Arial", 11)).pack(pady=10)
-        impresoras = win32print.EnumPrinters(2)
-        nombres = [p[2] for p in impresoras]
-        seleccion = tk.StringVar(value=nombres[0] if nombres else "")
-        lista = tk.OptionMenu(sub, seleccion, *nombres)
-        lista.config(width=40)
-        lista.pack(pady=5)
-
-        def imprimir_seleccionada():
-            impresora = seleccion.get()
-            if impresora:
-                imprimir_tiquete(contenido, impresora)
-            sub.destroy()
-
-        tk.Button(sub, text="🖨 Imprimir", command=imprimir_seleccionada).pack(pady=10)
-
-    def cerrar_ventana():
-        if ventana in ventanas_tiquete_abiertas:
-            ventanas_tiquete_abiertas.remove(ventana)
-        if not ventanas_tiquete_abiertas:
-            cerrar_proceso_impresion()
-        ventana.destroy()
-
-    # Botones
-    tk.Button(frame_botones, text="🖨 Imprimir (predeterminada)", command=imprimir_default).pack(side="left", padx=5)
-    tk.Button(frame_botones, text="🖨 Seleccionar impresora...", command=seleccionar_e_imprimir).pack(side="left", padx=5)
-    tk.Button(frame_botones, text="❌ Cerrar", command=cerrar_ventana).pack(side="left", padx=5)
-
-    ventana.protocol("WM_DELETE_WINDOW", cerrar_ventana)
-"""
 
 #definio funcion para actualizar el estado del pesaje que se comparte con el modulo 1 y lo indico cada que agrego o elimino pesaje en pesajes_temporales
-# 🔄 Guardar estado actual de pesajes en archivo JSON
-# 🔁 Carga todos los pesajes abiertos desde el JSON y los lleva a pesajes_temporales
+# Guardar estado actual de pesajes en archivo JSON
+# Carga todos los pesajes abiertos desde el JSON y los lleva a pesajes_temporales
 def actualizar_estado_pesajes():
     global pesajes_temporales
     pesajes_temporales = {}
@@ -418,19 +305,6 @@ cargar_estado_pesajes()
 
 
 # Función que se conecta al socket o modulo1 para obtener el peso actual y la hora desde modulo1
-"""def obtener_datos_peso():
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect(("127.0.0.1", 5000))
-            data = s.recv(1024)
-            resultado = json.loads(data.decode())
-            peso = resultado.get("peso", 0)
-            if peso is None:
-                peso = 0
-            return peso, resultado.get("timestamp", "")
-    except:
-        return 0, ""
-""" 
 def obtener_datos_peso():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -515,14 +389,13 @@ def centrar_ventana(ventana, ancho, alto, margen_superior=50):
 # --------------------------------------------------------------------
 
 
-# 🔁 Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrío, Astillable
+# Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrío, Astillable
 
 def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente):
     
-    #ventana.geometry("722x668")  # 👈 abre la ventana principal servicio bascula al abrir el formulario
-    centrar_ventana(ventana, 1022, 668, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
+    centrar_ventana(ventana, 1022, 668, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
     
-    # 🔁 Asegura que el frame esté visible incluso si fue ocultado con .pack_forget()
+    # Asegura que el frame esté visible incluso si fue ocultado con .pack_forget()
     frame_formulario.pack(pady=10, fill="x")
        
     # Limpiar formulario anterior
@@ -561,7 +434,7 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     entry_remision.grid(row=1, column=2, padx=10)
 
 
-    # 🔁 NUEVO BLOQUE - Manejo de navegación por ENTER entre campos con validación parcial
+    # NUEVO BLOQUE - Manejo de navegación por ENTER entre campos con validación parcial
 
     # Al presionar Enter en placa → validar formato y mover al grupo RG/MS
     def validar_placa_y_mover(event=None):
@@ -588,7 +461,7 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     def mover_a_remision(event=None):
         if empresa.get() not in ["RG", "MS"]:
             messagebox.showerror("Empresa no seleccionada", "Debe seleccionar la empresa (RG o MS).", parent=ventana)
-            # 🔁 Devolver el foco al botón RG
+            # Devolver el foco al botón RG
             for btn in frame_empresa.winfo_children():
                 if isinstance(btn, tk.Radiobutton) and btn.cget("text") == "RG":
                     btn.focus_set()
@@ -613,9 +486,9 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     entry_remision.bind("<Return>", validar_remision_y_confirmar)
 
 
-    # 🔘 Función crea boton para confirmar los datos y continuar el flujo de pesaje
+    # Función crea boton para confirmar los datos y continuar el flujo de pesaje
     def confirmar_datos():
-        placa = entry_placa.get().strip().upper() # 🔁 Convierte a mayúsculas automáticamente con upper      
+        placa = entry_placa.get().strip().upper() # Convierte a mayúsculas automáticamente con upper      
         remision = entry_remision.get().strip()
         empresa_sel = empresa.get()
 
@@ -688,23 +561,22 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         )
         
      
-     # 🔴 Función para boton cancelar del formulario
+     # Función para boton cancelar del formulario
 
     def cancelar():
         limpiar_formulario_unicamente()
         cerrar_proceso_impresion()
-        #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
+        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
 
 
-    # Botones de acción
+    # Botones de acción confirmar y cancelar
     frame_botones = tk.Frame(frame_formulario)
     frame_botones.pack(pady=10)
 
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=cancelar).pack(side="left", padx=10)
 
-# 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
+# Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.
 def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
@@ -721,7 +593,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 
     # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
       
-    # 📌 Si el pesaje ya fue iniciado → es un cierre manual
+    # Si el pesaje ya fue iniciado → es un cierre manual
     if clave in estado and tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado", "Astillable"]:
         def cerrar_con_peso(peso_final):
             fecha_inicial = estado[clave]["fecha_hora_entrada"]
@@ -729,7 +601,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             peso_neto = abs(peso_final - peso_inicial)
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
-            # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+            # INICIO BLOQUE GUARDADO EN MYSQL
             peso_bruto = max(peso_inicial, peso_final)
             peso_tara = min(peso_inicial, peso_final)
 
@@ -746,17 +618,17 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
                     "peso_bruto": peso_bruto,
                     "peso_tara": peso_tara,
                     "peso_neto": peso_neto,
-                    "placa": id_ingresado.split(" ")[0]# ← Asume que la placa es la primera parte del ID
+                    "placa": id_ingresado.split(" ")[0]# Asume que la placa es la primera parte del ID
                 },
                 id_autorizado=id_aut
             )
-            # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+            # FIN BLOQUE GUARDADO EN MYSQL
             
             
             # Actualizar y eliminar el pesaje
             estado[clave]["peso_salida"] = peso_final
             estado[clave]["fecha_hora_salida"] = fecha_actual
-            del estado[clave]# ✅ Elimina el pesaje cerrado
+            del estado[clave]# Elimina el pesaje cerrado
             
             with open(archivo_estado, "w") as file:
                 json.dump(estado, file, indent=4)
@@ -774,7 +646,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
                 f"Peso Neto: {peso_neto:.2f} kg\n"
                 "*********************************\n"
                 "_________________________________\n"
-                "\n\n\n"   # espacio en blanco
+                "\n\n\n"   #espacio en blanco
             )
             mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
             
@@ -788,7 +660,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
                 limpiar_formulario_unicamente()
 
         # Preguntar si desea usar el peso actual o ingresar manual para cerrar
-        # ✅ Aquí usamos confirmar_o_pedir_peso
+        # Aquí usamos confirmar_o_pedir_peso
         peso_confirmado = confirmar_o_pedir_peso(peso, ventana)
         if peso_confirmado is None:
             return
@@ -796,7 +668,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         cerrar_con_peso(peso_confirmado)
         return
 
-    # 🟢 NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
+    # NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
     if tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado"]:
         fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -834,7 +706,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             refrescar_tabla_pesajes()
 
 
-    # 🟣 ASTILLABLE: preguntar si tendrá cierre (igual que en mensuales)
+    # ASTILLABLE: preguntar si tendrá cierre (igual que en mensuales)
     elif tipo == "Astillable":
         cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio Astillable tendrá cierre de pesaje?", parent=ventana)
         fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -874,7 +746,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 
         else:
             # PESAJE ÚNICO (sin cierre posterior, directo a MySQL)
-            # 🔽 INICIO BLOQUE GUARDADO EN MYSQL
+            # INICIO BLOQUE GUARDADO EN MYSQL
             from integracion_mysql import guardar_cliente_y_pesaje
             
             # Obtener usuario autorizado actual
@@ -888,12 +760,12 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
                 datos_pesaje={
                     "peso_bruto": peso,
                     "peso_tara": 0,
-                    "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                    "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
                     "peso_neto": peso # neto = bruto si no hay tara
                 },
                 id_autorizado=id_aut
             )
-            # 🔼 FIN BLOQUE GUARDADO EN MYSQL
+            # FIN BLOQUE GUARDADO EN MYSQL
             
             encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
             contenido = (
@@ -913,7 +785,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
     # Limpieza visual del formulario después de completar (usando función dedicada)
     if limpiar_formulario_unicamente:
         limpiar_formulario_unicamente()
-        centrar_ventana(ventana, 1022, 529, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
+        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
 
 
 
@@ -974,7 +846,7 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
     entry_remision = tk.Entry(fila_formulario, width=12, font=("Arial", 10))
     entry_remision.grid(row=1, column=1, padx=10)
     
-    # 🔁 Mover foco de placa → remisión al presionar Enter
+    # Mover foco de placa → remisión al presionar Enter
     #entry_placa.bind("<Return>", lambda event: entry_remision.focus_set())
     def validar_placa_y_mover_a_remision(event=None):
         placa = entry_placa.get().strip().upper()
@@ -995,19 +867,19 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
 
     
 
-    # 🧩 Manejo de Enter en remisión con validación si está vacía
+    # Manejo de Enter en remisión con validación si está vacía
     #al presiona enter en remision llama a validar la remision y confirmar
     entry_remision.bind("<Return>", lambda event: confirmar_datos())
 
 
     
-    # 🔘 Función crea boton para confirmar los datos y continuar el flujo de pesaje
+    # Función crea boton para confirmar los datos y continuar el flujo de pesaje
     def confirmar_datos():        
-        placa = entry_placa.get().strip().upper()# 🔁 Convierte a mayúsculas automáticamente con upper 
-        remision = entry_remision.get().strip().upper()# 🔁 Convierte a mayúsculas automáticamente con upper 
+        placa = entry_placa.get().strip().upper()# Convierte a mayúsculas automáticamente con upper 
+        remision = entry_remision.get().strip().upper()# Convierte a mayúsculas automáticamente con upper 
         
         
-        # 🧪 Validación de placa
+        # Validación de placa
         if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
             messagebox.showerror(
                 "Error, Formato de placa inválido\n",
@@ -1019,8 +891,8 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
             )
             entry_placa.focus_set()
             return
-        entry_remision.focus_set()#######AQUI VOY EN EL PROGRAMA MODIFICANDO FOCO DE CURSOR SEGUN ENTER O BOTON CONTINUAR
-        # 🧪 Validación de remisión 1 (si se ingresó)
+        entry_remision.focus_set()# FOCO DE CURSOR SEGUN ENTER O BOTON CONTINUAR
+        # Validación de remisión 1 (si se ingresó)
         # Validación de remisión (si se ingresó, debe tener letras/números/espacios)
         if remision and not re.fullmatch(r"[A-Z0-9 ]+", remision):
             messagebox.showerror("Error", "La remisión solo puede contener letras, números y espacios.", parent=ventana)
@@ -1067,27 +939,26 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
    
             
             
-    # 🔴 Función para boton cancelar del formulario
+    #  Función para boton cancelar del formulario
     def cancelar():
         frame_formulario.pack_forget()
         cerrar_proceso_impresion()
-        #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
+        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
 
-    # Botones de acción
+    # Botones de acción Confirmar y Cancelar
     frame_botones = tk.Frame(frame_formulario)
     frame_botones.pack(pady=10)
 
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=cancelar).pack(side="left", padx=10)
-    #entry_remision.bind("<Return>", lambda event: confirmar_datos())
+    
   
   
-# 🔄 Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
+# Esta función guarda el pesaje en el archivo JSON (estado_pesajes.json).
 # Si ya existe, muestra el tiquete directamente. Si no, crea uno nuevo,
 # lo guarda, y muestra el tiquete. También limpia el formulario al finalizar.   
 def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None, datos_empresa=None):
-    #archivo_estado = "estado_actual_pesajes.json"
+    
     archivo_estado = RUTA_ESTADO_PESAJES
 
     try:
@@ -1096,12 +967,12 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
     except FileNotFoundError:
         estado = {}
 
-    # 📌 Si ya existe el pesaje → CIERRE
+    # Si ya existe el pesaje → CIERRE
     if clave in estado:
         peso_inicial = estado[clave]["peso_entrada"]
         fecha_inicial = estado[clave]["fecha_hora_entrada"]
 
-        # ✅ Solución a NoneType error
+        # Solución a NoneType error
         if peso is None:
             peso = 0  # O lanza advertencia si lo prefieres
             
@@ -1117,7 +988,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
 
-        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (pesajes con cierre)
+        # INICIO BLOQUE DE INTEGRACIÓN MYSQL (pesajes con cierre)
         peso_bruto = max(peso_inicial, peso_final)
         peso_tara = min(peso_inicial, peso_final)
 
@@ -1134,14 +1005,14 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
                 "peso_bruto": peso_bruto,
                 "peso_tara": peso_tara,
                 "peso_neto": peso_neto,
-                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
             },
             id_autorizado=id_aut
         )
-        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+        # FIN BLOQUE DE INTEGRACIÓN MYSQL
                
 
-        del estado[clave]  # 🔁 Elimina el registro cerrado del json
+        del estado[clave]  # Elimina el registro cerrado del json
 
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
@@ -1172,7 +1043,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         return
 
 
-    # 🔍 Si no existe el pesaje, preguntar si es solo uno (sin cierre) o si tendrá cierre posterior
+    # Si no existe el pesaje, preguntar si es solo uno (sin cierre) o si tendrá cierre posterior
     cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
 
     fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -1227,7 +1098,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
             "\n\n\n"   # espacio en blanco
         )
                 
-        # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (solo pesajes sin cierre)
+        # INICIO BLOQUE DE INTEGRACIÓN MYSQL (solo pesajes sin cierre)
         from integracion_mysql import guardar_cliente_y_pesaje
 
         # Obtener usuario autorizado actual
@@ -1241,11 +1112,11 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
                 "peso_bruto": peso,
                 "peso_tara": None,
                 "peso_neto": peso, # si no hay tara, peso_neto = peso_bruto
-                "placa": id_ingresado.split(" ")[0], # ← Asume que la placa es la primera parte del ID
+                "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
             },
             id_autorizado=id_aut
         )
-        # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL    
+        # FIN BLOQUE DE INTEGRACIÓN MYSQL    
         
         mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
@@ -1253,8 +1124,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
         refrescar_tabla_pesajes()
     if limpiar_formulario_unicamente:
         limpiar_formulario_unicamente()
-        #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
+        centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
         
         
 # --------------------------------------------------------------------
@@ -1310,7 +1180,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
     entry_correo.grid(row=1, column=4, padx=10)
 
 
-    # 🔁 Navegación automática con validaciones parciales al presionar Enter
+    # Navegación automática con validaciones parciales al presionar Enter
     def validar_placa_y_mover(event=None):
         placa = entry_placa.get().strip().upper()
         if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
@@ -1431,7 +1301,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 break
                 
         # ------------------------------------------
-        # 🔁 CIERRE AUTOMÁTICO SI YA EXISTE PESAJE
+        #  CIERRE AUTOMÁTICO SI YA EXISTE PESAJE
         # ------------------------------------------                
         if clave_existente:
             peso_ini = estado[clave_existente]["peso_entrada"]
@@ -1449,7 +1319,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             fecha_final = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
-            # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL (CIERRE AUTOMÁTICO)
+            # INICIO BLOQUE DE INTEGRACIÓN MYSQL (CIERRE AUTOMÁTICO)
             from integracion_mysql import guardar_cliente_y_pesaje
             
             # Determinar pesos            
@@ -1476,7 +1346,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 },
                 id_autorizado=id_aut
             )
-            # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+            # FIN BLOQUE DE INTEGRACIÓN MYSQL
 
 
             del estado[clave_existente]
@@ -1489,7 +1359,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             actualizar_estado_pesajes()
             contenido = (
                 f"Cliente: {razon}\n"
-                f"NIT: {nit}\n"
+                f"NIT/Cédula: {nit}\n"
                 f"Correo: {correo}\n"
                 f"ID: {id_ingresado}\n"
                 f"Peso Inicial: {peso_ini:.2f} kg\n"
@@ -1508,7 +1378,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 limpiar_formulario_unicamente()
             return
 
-        # 🔘nuevo pesaje,  Si no existe, preguntamos si tendrá cierre
+        # nuevo pesaje,  Si no existe, preguntamos si tendrá cierre
         cerrar = messagebox.askyesno("¿Tendrá cierre?", "¿Este servicio tendrá cierre de pesaje?", parent=ventana)
 
         if cerrar:
@@ -1536,8 +1406,9 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             actualizar_estado_pesajes()
             contenido = (
                 f"Cliente: {razon}\n"
-                f"NIT: {nit}\n"
+                f"NIT/Cédula: {nit}\n"
                 f"Correo: {correo}\n"
+                f"Pesaje inicial registrado:\n"
                 f"ID: {id_ingresado}\n"
                 f"Peso Inicial: {peso:.2f} kg\n"
                 f"Fecha Inicial: {fecha_actual}\n"
@@ -1547,11 +1418,11 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             )
             mostrar_tiquete_con_impresion("Tiquete de Entrada", contenido)
         else:
-            # 🟢 Nuevo comportamiento: imprimir directamente el peso actual como único pesaje
+            # Nuevo comportamiento: imprimir directamente el peso actual como único pesaje
             fecha_actual = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             contenido = (
                 f"Cliente: {razon}\n"
-                f"NIT: {nit}\n"
+                f"NIT/Cédula: {nit}\n"
                 f"Correo: {correo}\n"
                 f"ID: {id_ingresado}\n"
                 f"Peso registrado: {peso:.2f} kg\n"
@@ -1561,7 +1432,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 "\n\n\n"   # espacio en blanco
             )
             
-            # 🔽 INICIO BLOQUE DE INTEGRACIÓN MYSQL
+            # INICIO BLOQUE DE INTEGRACIÓN MYSQL
             from integracion_mysql import guardar_cliente_y_pesaje
             
             # Obtener usuario autorizado actual
@@ -1584,7 +1455,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                 },
                 id_autorizado=id_aut
             )
-            # 🔼 FIN BLOQUE DE INTEGRACIÓN MYSQL
+            # FIN BLOQUE DE INTEGRACIÓN MYSQL
             
             mostrar_tiquete_con_impresion("Tiquete de Pesaje", contenido)
 
@@ -1594,12 +1465,12 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             limpiar_formulario_unicamente()
             centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
 
-    # Botones
+    # Botones de accion Confirmar y Cancelar
     frame_botones = tk.Frame(frame_formulario)
     frame_botones.pack(pady=10)
     tk.Button(frame_botones, text="✅ Confirmar", font=("Arial", 10, "bold"), command=confirmar_datos).pack(side="left", padx=10)
     tk.Button(frame_botones, text="❌ Cancelar", font=("Arial", 10), command=lambda: (frame_formulario.pack_forget(), cerrar_proceso_impresion(),
-                                                                                     centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original
+                                                                                     centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original
                                                                                      )).pack(side="left", padx=10)
 
 
@@ -1624,7 +1495,7 @@ def modulo_servicio():
     
     # Función que se ejecuta al hacer clic en uno de los botones de servicio
     def verificar_servicio(tipo, cliente_seleccionado=None):
-        frame_subclientes.pack_forget()  # 🔁 Siempre cerrar sub-botones al iniciar el flujo
+        frame_subclientes.pack_forget()  # Siempre cerrar sub-botones al iniciar el flujo
         
         # Siempre capturamos el peso actual al presionar un botón principal en variable global
         global peso_capturado_global
@@ -1715,7 +1586,7 @@ def modulo_servicio():
     frame_botones = tk.Frame(frame_superior)
     frame_botones.pack()
 
-    # 🔻 Frame donde aparecerán sub-botones de clientes externos
+    # Frame donde aparecerán sub-botones de clientes externos
     global frame_subclientes # declaro la variable como global para que sea visible fuera del metodo 
     frame_subclientes = tk.Frame(frame_superior)
     
@@ -1723,11 +1594,11 @@ def modulo_servicio():
     frame_subclientes.pack_forget()  # Oculta botones por defecto
 
     
-    # 🔳 Frame donde se insertarán formularios dinámicos (placa, remisión, RG/MS, etc.)
+    # Frame donde se insertarán formularios dinámicos (placa, remisión, RG/MS, etc.)
     frame_formulario = tk.Frame(ventana)
     frame_formulario.pack(pady=10, fill="x")
     
-    # ✅ Función para limpiar únicamente el formulario embebido (sin afectar botones principales)
+    # Función para limpiar únicamente el formulario embebido (sin afectar botones principales)
     def limpiar_formulario_unicamente():
         if frame_formulario:
             for widget in frame_formulario.winfo_children():
@@ -1735,7 +1606,7 @@ def modulo_servicio():
             frame_formulario.pack_forget()
 
     
-    # 🧾 Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha) con scroll bar
+    # Tabla para mostrar pesajes abiertos (clave, peso inicial, fecha) con scroll bar
     tk.Label(ventana, text="Pesajes Abiertos:", font=("Arial", 12)).pack(pady=(10, 0))
 
     # Frame para tabla y scrollbars
@@ -1757,9 +1628,7 @@ def modulo_servicio():
     tree.heading("clave", text="Clave")
     tree.heading("peso", text="Peso Inicial")
     tree.heading("fecha", text="Fecha")
-    #tree.column("clave", width=300)
-    #tree.column("peso", anchor="center")
-    #tree.column("fecha", anchor="center")
+
     
     tree.column("clave", width=500, anchor="w")   # más ancha y alineada a la izquierda
     tree.column("peso", width=100, anchor="center")  # más angosta
@@ -1779,7 +1648,7 @@ def modulo_servicio():
     frame_pesajes.grid_columnconfigure(0, weight=1)
 
 
-    # 🔁 Función para cargar y refrescar la tabla desde el JSON en tiempo real
+    # Función para cargar y refrescar la tabla desde el JSON en tiempo real
     def refrescar_tabla_pesajes():
         selected = tree.selection()
         selected_claves = [tree.item(item, "values")[0] for item in selected]
@@ -1815,7 +1684,7 @@ def modulo_servicio():
     #ventana.after(500, refrescar_tabla_pesajes)  # Se refresca automáticamente
     refresco_automatico_tabla()
     
-    # 🔘 Botones debajo de la tabla
+    # Botones debajo de la tabla
     frame_botones_tabla = tk.Frame(ventana)
     frame_botones_tabla.pack(pady=(0, 10))
 
@@ -1853,8 +1722,9 @@ def modulo_servicio():
             correo = datos.get("correo", "")
             contenido = (
                 f"Cliente: {razon}\n"
-                f"NIT: {nit}\n"
+                f"NIT/Cédula: {nit}\n"
                 f"Correo: {correo}\n"
+                f"Pesaje inicial registrado:\n"
                 f"ID: {datos.get('id','')}\n"
                 f"Peso Inicial: {datos.get('peso_entrada',0):.2f} kg\n"
                 f"Fecha Inicial: {datos.get('fecha_hora_entrada','')}\n"
@@ -2015,13 +1885,12 @@ def modulo_servicio():
                         command=lambda n=nombre_cliente: seleccionar_cliente_externo(n)
                         ).pack(pady=2)
 
-            # 🔘 Botón cancelar para cerrar submenú de clientes
+            # Botón cancelar para cerrar submenú de clientes
             def cancelar_clientes():
                 frame_subclientes.pack_forget()
                 cerrar_proceso_impresion()  # Elimina archivo puntero
                 mostrar_clientes.set(False)
-                #ventana.geometry("722x529")  # 👈 Restaura tamaño original al cerrar el formulario
-                centrar_ventana(ventana, 1022, 529, margen_superior=50)  # 👈 Restaura tamaño original y centrar ventana original al cerrar el formulario
+                centrar_ventana(ventana, 1022, 529, margen_superior=50)  # Restaura tamaño original y centrar ventana original al cerrar el formulario
 
             tk.Button(frame_subclientes, text="❌ Cancelar", font=("Arial", 10),
                     command=cancelar_clientes).pack(pady=(10, 5))
@@ -2029,7 +1898,7 @@ def modulo_servicio():
             frame_subclientes.pack()
             mostrar_clientes.set(True)
         else:
-            # 🔒 Activar proceso para los otros botones principales
+            # Activar proceso para los otros botones principales
             with open(".proceso_impresion_activo", "w") as f:
                 f.write("1")
             

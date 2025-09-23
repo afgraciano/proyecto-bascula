@@ -1,3 +1,23 @@
+"""
+reportes_bascula.py
+
+Módulo independiente para la consulta y generación de reportes de los registros de pesaje.
+
+Funciones principales:
+- Interfaz gráfica (Tkinter) para consultar pesajes almacenados en la base de datos MySQL.
+- Búsqueda de registros por rango de fechas, tipo de cliente o evento.
+- Visualización de resultados en una tabla con scroll.
+- Exportación de reportes a archivos:
+  * Excel (.xlsx) mediante openpyxl.
+  * Access (.mdb o .accdb) mediante pyodbc (si está disponible).
+- Uso exclusivo en modo consulta: no modifica ni elimina registros de la base de datos.
+- Diseño separado del sistema principal de pesaje, para no interferir con sus procesos activos.
+
+Notas:
+- Requiere conexión a la misma base de datos que usa el sistema de báscula.
+- Se recomienda usar este módulo para análisis y generación de reportes administrativos.
+"""
+
 # === Importación de módulos necesarios ===
 import tkinter as tk  # Para la interfaz gráfica
 from tkinter import ttk, messagebox, filedialog  # Widgets y mensajes de Tkinter
@@ -347,7 +367,6 @@ class ReportesBasculaApp:
         tipo_cliente = datos.get("tipo_cliente", "desconocido")
         nombre = datos.get("nombre", "N/A")
         nit = datos.get("cedula_nit", "N/A")
-        #tipo = datos.get("tipo_cliente")
         fecha = datos.get("fecha_hora", "")
         bruto = datos.get("peso_bruto", 0)
         tara = datos.get("peso_tara", 0)
@@ -366,7 +385,7 @@ class ReportesBasculaApp:
 
         contenido = (
             f"Cliente: {nombre}\n"
-            f"NIT: {nit}\n"
+            f"NIT/Cédula: {nit}\n"
             f"Pesaje final registrado.\n"
             f"{tipo_cliente}:\n"
             f"ID: {id_ingresado}\n"
@@ -391,7 +410,7 @@ class ReportesBasculaApp:
         top.grab_set()             # Bloquear interacción con root
         top.focus_set()            # Dar foco inmediato al calendario
 
-        cal = Calendar(top, date_pattern="yyyy-mm-dd")
+        cal = Calendar(top, date_pattern="yyyy-mm-dd", locale="es_ES") #indico formato de fecha e idioma español
         cal.pack(pady=10)
 
 
@@ -452,7 +471,7 @@ class ReportesBasculaApp:
         self.fecha_fin.bind("<Return>", lambda e: self.consultar())
 
         # Filtro por placa o nombre (solo para pesaje)
-        ttk.Label(filtro_frame, text="Cliente / Placa / Cedula o Nit:").grid(row=1, column=0, padx=5, pady=5)
+        ttk.Label(filtro_frame, text="Cliente / Placa / Cédula o Nit:").grid(row=1, column=0, padx=5, pady=5)
         self.valor_filtro = ttk.Entry(filtro_frame, width=30)
         self.valor_filtro.grid(row=1, column=1, padx=5, pady=5)
 
@@ -685,7 +704,7 @@ class ReportesBasculaApp:
                 consulta += " AND p.tipo_cliente = %s"
                 valores.append(tipo_cliente)   # este valor será usado en el siguiente %s encontrado en la consulta
 
-            # Si el usuario escribió algo en el filtro libre (placa / cedula / nombre), añadimos condiciones LIKE.
+            # Si el usuario escribió algo en el filtro libre (placa / cédula / nombre), añadimos condiciones LIKE.
             if filtro_valor:
                 # Si ya estamos filtrando por un tipo específico (tercero/mensual/interno),
                 # entonces en la SELECT ya existe la columna `nombre` y `cedula_nit` (por el JOIN específico).
@@ -781,8 +800,26 @@ class ReportesBasculaApp:
             columnas = list(datos_modificados[0].keys())
             self.tree.config(columns=columnas, show="headings")
 
+            # Diccionario de alias para mostrar encabezados más legibles
+            alias_columnas = {
+                "cedula_nit": "cédula_nit",
+                "id_pesaje": "ID Pesaje",
+                "id_ingresado": "ID Ingresado",
+                "nombre": "Cliente",
+                "fecha_hora": "Fecha y Hora",
+                "tipo_cliente": "Tipo Cliente",
+                "peso_bruto": "Peso Bruto (kg)",
+                "peso_tara": "Peso Tara (kg)",
+                "peso_neto": "Peso Neto (kg)",
+                "placa": "Placa",
+                "correo_remision": "Correo Remisión",
+                "nombre_autorizado": "Autorizado"
+            }
+
             for col in columnas:
-                self.tree.heading(col, text=col)
+                # Usa alias si existe, de lo contrario muestra el nombre original
+                texto = alias_columnas.get(col, col)
+                self.tree.heading(col, text=texto)
                 self.tree.column(col, width=130, anchor="center")
 
             for row in datos_modificados:
@@ -853,15 +890,6 @@ class ReportesBasculaApp:
 
         # Crear archivo vacío si no existe
         if not os.path.exists(archivo):
-            """# Opción 1: copiar una base vacía de Access como plantilla
-            plantilla = r"C:\Windows\SysWOW64\msaccess.accdb"  # ejemplo
-            if os.path.exists(plantilla):
-                shutil.copy(plantilla, archivo)
-            else:
-                # Opción 2: crear un archivo vacío (el driver lo acepta igual)
-                #open(archivo, "w").close()
-                if not os.path.exists(archivo):
-                    crear_base_access(archivo)"""
             crear_base_access(archivo)
 
         datos_export = self._preparar_datos_exportacion()
@@ -902,12 +930,6 @@ class ReportesBasculaApp:
             cursor.execute(f"CREATE TABLE {tabla} ({columnas_def})")
 
             # Insertar filas
-            """for _, fila in df.iterrows():
-                placeholders = ", ".join(["?"] * len(fila))
-                cursor.execute(
-                    f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({placeholders})",
-                    tuple(str(x) for x in fila.values)
-                )"""
             for _, fila in df.iterrows():
                 placeholders = ", ".join(["?"] * len(fila))
                 valores = []
@@ -1017,7 +1039,7 @@ class ReportesBasculaApp:
         if not archivo:
             return
         
-        #mysqldump_path = r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe"  # Ruta completa para evitar modificar path
+        # Ruta completa para evitar modificar path
         mysqldump_path = shutil.which("mysqldump") or r"C:\Program Files\MySQL\MySQL Server 8.0\bin\mysqldump.exe"
 
         # Verificar si el ejecutable existe

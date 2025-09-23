@@ -1,3 +1,28 @@
+"""
+crear_base_datos_mejorado.py
+
+Script para la creación y actualización de la base de datos MySQL usada en el sistema de pesaje.
+
+Funciones principales:
+- Crear la base de datos `bascula_silvotecnia` si no existe.
+- Definir las tablas principales:
+  * pesajes
+  * cliente_tercero
+  * cliente_mensual
+  * cliente_interno
+  * desconexiones
+  * personal_autorizado
+- Verificar y agregar columnas adicionales en tablas existentes:
+  * Agrega columna `tiempo_desconexion` en `desconexiones` si no existe.
+  * Agrega columna `id_autorizado` con su llave foránea en `pesajes` y `desconexiones`.
+- Establecer relaciones de integridad referencial:
+  * `pesajes.id_autorizado → personal_autorizado.id_autorizado`
+  * `desconexiones.id_autorizado → personal_autorizado.id_autorizado`
+
+Notas:
+- Este script se debe ejecutar una sola vez al instalar el sistema o tras modificaciones de esquema.
+- Es seguro para múltiples ejecuciones: usa `CREATE TABLE IF NOT EXISTS` y validaciones previas antes de alterar.
+"""
 # Contenido del script para crear múltiples tablas
 import mysql.connector
 
