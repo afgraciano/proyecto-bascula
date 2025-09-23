@@ -1,0 +1,24 @@
+pip install pyserial pyodbc pywin32
+
+python -m pip install --upgrade pip
+
+pip install pywin32
+
+pip install psutil
+
+este se ejecuta en setup comand promp del com0com
+install PortName=COM6 PortName=COM7
+
+
+para instalar MySQL primero instalo el típico, pongo root y clave:bascula2025
+no modifico puerto 3306
+luego le instalo el programa workbench
+luego en el commander lo siguiente:
+
+pip install mysql-connector-python
+pip install tabulate
+pip install pandas openpyxl fpdf pyodbc
+pip install tkcalendar
+pip install pyinstaller
+
+

@@ -515,7 +515,7 @@ def centrar_ventana(ventana, ancho, alto, margen_superior=50):
 # --------------------------------------------------------------------
 
 
-# 🔁 Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrio, Astillable
+# 🔁 Función que crea y muestra el formulario visual estándar para Inmuniza, Aserrío, Astillable
 
 def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente):
     
@@ -722,7 +722,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
     # Si ya existe un pesaje abierto (osea la clave ya existe), mostrar tiquete
       
     # 📌 Si el pesaje ya fue iniciado → es un cierre manual
-    if clave in estado and tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
+    if clave in estado and tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado", "Astillable"]:
         def cerrar_con_peso(peso_final):
             fecha_inicial = estado[clave]["fecha_hora_entrada"]
             peso_inicial = estado[clave]["peso_entrada"]
@@ -779,10 +779,10 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             mostrar_tiquete_con_impresion("Pesaje cerrado", contenido)
             
             
-            actualizar_estado_pesajes() # ✅ actualiza JSON en memoria
+            actualizar_estado_pesajes() #  actualiza JSON en memoria
             
             if refrescar_tabla_pesajes:
-                refrescar_tabla_pesajes() # ✅ actualiza tabla en pantalla
+                refrescar_tabla_pesajes() #  actualiza tabla en pantalla
                 
             if limpiar_formulario_unicamente:
                 limpiar_formulario_unicamente()
@@ -797,7 +797,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         return
 
     # 🟢 NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
-    if tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado"]:
+    if tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado"]:
         fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Obtener usuario autorizado actual
@@ -1609,7 +1609,7 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
 # Aquí se gestionan:
 #   - La captura del peso en tiempo real desde el socket
 #   - La activación de los formularios embebidos por tipo de servicio
-#   - El control de los botones principales (Externo, Aserrio, Inmuniza, Astillable)
+#   - El control de los botones principales (Externo, Aserrío, Inmuniza, Astillable)
 #   - La visualización y refresco de pesajes abiertos en una tabla
 #   - La impresión de tiquetes y control de estados
 # También se asegura que solo se pueda realizar un proceso de pesaje activo a la vez.
@@ -1659,8 +1659,8 @@ def modulo_servicio():
             tipo_pago = subtipos[cliente.get()]  # Obtiene tipo de pago según cliente
             # comportamiento para Tercero (pago inmediato)
 
-        # Si es Inmuniza, Aserrio o Astillable Seleccionado, se necesita un ID y se hace lógica de pesaje doble. si es Astillable solo logica de Externos (Mensuales)
-        elif tipo in ["Inmuniza", "Aserrio", "Astillable Seleccionado", "Astillable"]:
+        # Si es Inmuniza, Aserrío o Astillable Seleccionado, se necesita un ID y se hace lógica de pesaje doble. si es Astillable solo logica de Externos (Mensuales)
+        elif tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado", "Astillable"]:
             mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_pesajes, limpiar_formulario_unicamente)
             return
 
@@ -1889,8 +1889,8 @@ def modulo_servicio():
                 "\n\n\n"   # espacio en blanco
             )
 
-        # 3) Internos (Aserrio / Inmuniza /Astillable Seleccionado /Astillable) — intentar inferir RG / MS del ID
-        elif tipo in ("Aserrio", "Inmuniza","Astillable Seleccionado", "Astillable"):
+        # 3) Internos (Aserrío / Inmuniza /Astillable Seleccionado /Astillable) — intentar inferir RG / MS del ID
+        elif tipo in ("Aserrío", "Inmuniza","Astillable Seleccionado", "Astillable"):
             id_val = datos.get("id", "")
             # Buscar código RG o MS en el id (maneja formatos como "ABC RG123" o "ABC MS123")
             m = re.search(r'\b(RG|MS)\b', id_val)
@@ -2042,7 +2042,7 @@ def modulo_servicio():
     
     
     # Creacion 4 botones principales
-    tipos = ["Externo", "Aserrio", "Inmuniza", "Astillable Seleccionado", "Astillable"]
+    tipos = ["Externo", "Aserrío", "Inmuniza", "Astillable Seleccionado", "Astillable"]
     for tipo in tipos:
         ancho = 20 if tipo == "Astillable Seleccionado" else 10 #ancho para todos botones en 10 excepto Astillable Seleccionado que va en 20
         tk.Button(frame_botones, text=tipo, width=ancho, font=("Arial", 9),

@@ -346,12 +346,21 @@ def mostrar_registro():
         except Exception as e:
             messagebox.showerror("Error", str(e))
 
+    #--Botones--
+    #boton registrar
     tk.Button(ventana, text="Registrar", command=registrar).pack(pady=10)
+    
+    def volver_login():
+        ventana.destroy()
+        #mostrar_login_bloqueante()  # vuelve a abrir el login
+    
+    #boton atraz usa funcion anterior volver_login
+    tk.Button(ventana, text="Atrás", command=volver_login).pack(pady=5)
+    
     ventana.protocol("WM_DELETE_WINDOW", lambda: None)
     ventana.grab_set()
     ventana.focus_force()
     root.wait_window(ventana)
-    #ventana.mainloop()
     
     
 # =======================
