@@ -23,7 +23,7 @@ def guardar_puerto_config(puerto):
             
         return True
     except Exception as e:
-        print(f"Error al guardar configuración: {e}")
+        #print(f"Error al guardar configuración: {e}")
         return False
 
 # Valida la selección y guarda el puerto

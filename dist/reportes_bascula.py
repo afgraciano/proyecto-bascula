@@ -9,7 +9,7 @@ import os  # Operaciones con archivos y deteccion de ejecutables
 
 
     
-# ✅ Función global para centrar cualquier ventana (Tk o Toplevel)
+#  Función global para centrar cualquier ventana (Tk o Toplevel)
 def centrar_ventana(ventana, ancho=1300, alto=650, margen_superior=None):
     """
     Centra una ventana (Tk o Toplevel) en la pantalla con el tamaño indicado.
@@ -21,25 +21,34 @@ def centrar_ventana(ventana, ancho=1300, alto=650, margen_superior=None):
         margen_superior -> si se pasa, reemplaza la posición vertical (y),
                            útil por ejemplo para ventanas de impresión
     """
-    # 🔹 Asegura que la ventana ya haya calculado medidas internas
+    #  Asegura que la ventana ya haya calculado medidas internas
     ventana.update_idletasks()
 
-    # 🔹 Obtener dimensiones de la pantalla
+    #  Obtener dimensiones de la pantalla
     ancho_pantalla = ventana.winfo_screenwidth()
     alto_pantalla = ventana.winfo_screenheight()
 
-    # 🔹 Calcular posición horizontal (siempre centrada)
+    #  Calcular posición horizontal (siempre centrada)
     pos_x = int((ancho_pantalla / 2) - (ancho / 2))
 
-    # 🔹 Calcular posición vertical
+    #  Calcular posición vertical
     if margen_superior is None:
         pos_y = int((alto_pantalla / 2) - (alto / 2))  # Centrado vertical
     else:
         pos_y = margen_superior  # Usar el valor dado
 
-    # 🔹 Aplicar tamaño y posición
+    #  Aplicar tamaño y posición
     ventana.geometry(f"{ancho}x{alto}+{pos_x}+{pos_y}")
 
+# === Función auxiliar para crear base Access vacía ===
+def crear_base_access(ruta):
+    try:
+        import win32com.client  # libreria importada
+        engine = win32com.client.Dispatch("DAO.DBEngine.120")
+        db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)
+        db.Close()    
+    except ImportError:
+        messagebox.showerror("Error", "win32com.client no está instalado. No se puede crear Access.")
 
 
 # === Encabezado único para impresión y preview ===
@@ -53,6 +62,8 @@ ENCABEZADO_TIQUETE = (
 # === Función para imprimir directamente en impresora ===
 def imprimir_tiquete(texto, impresora=None):
     import win32print, win32ui # librerias Para impresión
+    
+    #  Obtener impresora por defecto si no se pasó
     if impresora is None:
         impresora = win32print.GetDefaultPrinter()
 
@@ -60,47 +71,84 @@ def imprimir_tiquete(texto, impresora=None):
         messagebox.showerror("Error impresión", "No hay impresora predeterminada configurada.")
         return
 
-    hprinter = win32print.OpenPrinter(impresora)
+    hprinter = None
+    hdc = None
     try:
+        hprinter = win32print.OpenPrinter(impresora)
+        # Crear DC de impresora
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(impresora)
 
-        dpi = hdc.GetDeviceCaps(88)       # LOGPIXELSX
+        # Medidas del dispositivo
         width_px = hdc.GetDeviceCaps(110) # HORZRES
         height_px = hdc.GetDeviceCaps(111)# VERTRES
 
-        chars_per_line = max(len(line) for line in texto.split("\n")) or 1
-        font_size = max(24, int(width_px / (chars_per_line + 2)))
+        # formato de encabezado
+        lineas_encabezado = ENCABEZADO_TIQUETE.splitlines()
+        lineas_contenido = texto.splitlines()
 
+        # Calcular tamaño de fuente (basado en lo más largo del contenido)
+        chars_per_line = max((len(line) for line in lineas_encabezado + lineas_contenido), default=1)
+        font_size = max(24, int(width_px / (chars_per_line + 2)))
+        font_size = min(font_size, 240)
+
+        # Márgenes y espaciado
+        x_margin = 1
+        y = 50
+        line_spacing = max(12, int(font_size * 1.5))
+
+        # Iniciar doc/página
         hdc.StartDoc("Tiquete Báscula")
         hdc.StartPage()
 
-        fuente = win32ui.CreateFont({"name": "Consolas", "height": font_size, "weight": 700})
-        hdc.SelectObject(fuente)
-
-        y = 50
-        line_spacing = int(font_size * 1.5)
-
-        # Encabezado
-        fuente_titulo = win32ui.CreateFont({"name": "Consolas", "height": font_size + 8, "weight": 900})
-        hdc.SelectObject(fuente_titulo)
-        for linea_titulo in ENCABEZADO_TIQUETE.strip().split("\n"):
-            hdc.TextOut(50, y, linea_titulo)
+        # === Encabezado con fuente más grande ===
+        fuente_encabezado = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size + 8,
+            "weight": 700
+        })
+        hdc.SelectObject(fuente_encabezado)
+        for linea in lineas_encabezado:
+            hdc.TextOut(x_margin, y, linea)
             y += line_spacing
 
-        y += line_spacing
-        fuente_normal = win32ui.CreateFont({"name": "Consolas", "height": font_size, "weight": 700})
-        hdc.SelectObject(fuente_normal)
-        for linea in texto.split("\n"):
-            hdc.TextOut(50, y, linea)
+        y += line_spacing  # espacio adicional tras el encabezado
+
+        # === Contenido con fuente un poco más pequeña ===
+        fuente_contenido = win32ui.CreateFont({
+            "name": "Consolas",
+            "height": font_size + 3,
+            "weight": 700
+        })
+        hdc.SelectObject(fuente_contenido)
+        for linea in lineas_contenido:
+            hdc.TextOut(x_margin, y, linea)
             y += line_spacing
 
+        # Finalizar impresión
+        # Cerrar página y documento
         hdc.EndPage()
         hdc.EndDoc()
-        hdc.DeleteDC()
+
+    except Exception as e:
+        try:
+            messagebox.showerror("Error de impresión", f"No se pudo imprimir.\n\n{e}")
+        except:
+            pass
+
     finally:
-        win32print.ClosePrinter(hprinter)
-        
+        # Liberar DC si existe
+        try:
+            if hdc:
+                hdc.DeleteDC()
+        except:
+            pass
+        # Cerrar impresora
+        try:
+            if hprinter:
+                win32print.ClosePrinter(hprinter)
+        except:
+            pass    
         
 # === Gestión de archivo puntero para impresión ===
 # proceso_impresion_activo_reportes() -> Verifica si hay impresión activa
@@ -125,6 +173,30 @@ def cerrar_proceso_impresion():
 # Lista global de ventanas activas
 ventanas_tiquete_abiertas = []
 
+
+# === Función auxiliar para mostrar alerta siempre encima ===
+def mostrar_alerta_superior(mensaje, titulo="Impresión en curso"):
+    alerta = tk.Toplevel()
+    alerta.title(titulo)
+    alerta.geometry("350x120")
+    alerta.resizable(False, False)
+    alerta.attributes("-topmost", True)  #  siempre encima
+    alerta.grab_set()  #  Bloquea interacción hasta cerrarlo
+
+    tk.Label(
+        alerta,
+        text=mensaje,
+        font=("Consolas", 10),
+        wraplength=330,
+        justify="center"
+    ).pack(pady=20)
+
+    tk.Button(alerta, text="OK", command=alerta.destroy).pack(pady=5)
+
+    alerta.lift()        #  Súbelo en la pila de ventanas
+    alerta.focus_force() #  Le da foco inmediatamente
+
+
 # === Ventana preview de tiquete (con puntero activo) ===
 def mostrar_tiquete_con_impresion(titulo, contenido):
     import win32print #libreria para impresion
@@ -133,20 +205,14 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     Solo permite un tiquete activo a la vez.
     Resetea puntero si existe de sesiones anteriores.
     """
+
     # Verificar si hay un tiquete abierto
     if proceso_impresion_activo():
-        try:
-            # Intentar abrir ventana anterior (si existe) o alertar
-            messagebox.showwarning(
-                "Impresión en curso",
-                "Ya hay un tiquete abierto. Ciérrelo antes de abrir otro."
-            )
-            return
-        except Exception:
-            # Si el puntero existe pero la ventana anterior se cerró de forma inesperada
-            cerrar_proceso_impresion()  # elimina el puntero residual
-
-
+        mostrar_alerta_superior(
+            "Ya hay un tiquete abierto. Ciérrelo antes de abrir otro."
+        )
+        return
+   
     # Crear archivo puntero cuando se abre el tiquete
     with open(ARCHIVO_PUNTERO_IMPRESION, "w") as f:
         f.write("Proceso de impresión activo")
@@ -156,7 +222,8 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana.title(titulo)
     centrar_ventana(ventana, 410, 500, margen_superior=50)
     ventana.resizable(False, False)
-    ventana.attributes("-topmost", True)
+    #ventana.attributes("-topmost", True)
+    ventana.grab_set()  #  Hace modal el preview
 
     ventanas_tiquete_abiertas.append(ventana)
 
@@ -164,8 +231,9 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     text_area = tk.Text(ventana, wrap="word", font=("Consolas", 10))
     text_area.pack(expand=True, fill="both", padx=10, pady=10)
 
-    texto_completo = ENCABEZADO_TIQUETE + contenido
-    text_area.insert("1.0", texto_completo)
+    texto_preview = ENCABEZADO_TIQUETE + contenido #lo que se ve en el preview
+    texto_completo = contenido #lo que manda a imprimir, ya viene con encabezado
+    text_area.insert("1.0", texto_preview) #lo que muestra en encabezado
     text_area.config(state="disabled")
 
     # Frame de botones
@@ -175,7 +243,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     # --- Botón imprimir en impresora predeterminada ---
     def imprimir_default():
         try:
-            imprimir_tiquete(texto_completo)
+            imprimir_tiquete(texto_completo)#imprime ya con encabezado traido de imprimir_tiquete
         except Exception as e:
             messagebox.showerror("Error de impresión", f"No se pudo imprimir.\n{e}")
         
@@ -254,11 +322,24 @@ class ReportesBasculaApp:
             )
             return
         
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("Sin selección", "Seleccione un registro para imprimir.")
+        
+        # 🔹 Validar que el tipo de reporte sea "pesajes"
+        if self.tipo_reporte.get() != "pesajes":
+            messagebox.showwarning(
+                "Impresión no permitida",
+                "Solo puede imprimir recibos desde el reporte de **Pesajes**.\n"
+                "Seleccione 'pesajes' en 'Tipo de Reporte', presione boton `Consultar` y escoja un registro para imprimir.",
+                parent=self.root
+            )
             return
 
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Sin selección", "Seleccione un registro para imprimir.", parent=self.root)
+            return
+
+        index = self.tree.index(selected[0])
+        datos = self.datos_actuales[index]
         index = self.tree.index(selected[0])
         datos = self.datos_actuales[index]
 
@@ -266,12 +347,14 @@ class ReportesBasculaApp:
         tipo_cliente = datos.get("tipo_cliente", "desconocido")
         nombre = datos.get("nombre", "N/A")
         nit = datos.get("cedula_nit", "N/A")
+        #tipo = datos.get("tipo_cliente")
         fecha = datos.get("fecha_hora", "")
         bruto = datos.get("peso_bruto", 0)
         tara = datos.get("peso_tara", 0)
         neto = datos.get("peso_neto", 0)
         placa = datos.get("placa", "")
 
+        
         # --- Detectar empresa según tipo_cliente ---
         if tipo_cliente == "interno":
             if "RG" in str(id_ingresado):
@@ -284,12 +367,17 @@ class ReportesBasculaApp:
         contenido = (
             f"Cliente: {nombre}\n"
             f"NIT: {nit}\n"
+            f"Pesaje final registrado.\n"
+            f"{tipo_cliente}:\n"
             f"ID: {id_ingresado}\n"
             f"Placa: {placa}\n"
             f"Peso Bruto: {bruto} kg\n"
             f"Peso Tara: {tara} kg\n"
             f"Peso Neto: {neto} kg\n"
-            f"Fecha final: {fecha}"
+            f"Fecha final: {fecha}\n"
+            "*********************************\n"
+            "_________________________________\n"
+            "\n\n\n"   # espacio en blanco
         )
         # mostramos el tiquete (crea el puntero)
         mostrar_tiquete_con_impresion("Reporte de Báscula", contenido)
@@ -627,12 +715,22 @@ class ReportesBasculaApp:
 
 
         else:
-            # Consulta de desconexiones
-            cursor.execute("""
-                SELECT * FROM desconexiones
-                WHERE fecha_hora BETWEEN %s AND %s
-                ORDER BY fecha_hora DESC
-            """, (fecha_inicio, fecha_fin))
+            # ==========================
+            # Consulta de desconexiones con nombre del autorizado
+            # ==========================
+            consulta = """
+                SELECT d.id_desconexion,
+                    d.fecha_hora,
+                    d.tipo_desconexion,
+                    d.descripcion,
+                    d.tiempo_desconexion,
+                    SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
+                FROM desconexiones d
+                LEFT JOIN personal_autorizado pa ON d.id_autorizado = pa.id_autorizado
+                WHERE d.fecha_hora BETWEEN %s AND %s
+                ORDER BY d.fecha_hora DESC
+            """
+            cursor.execute(consulta, (fecha_inicio, fecha_fin))
 
         resultados = cursor.fetchall()
         conn.close()
@@ -730,14 +828,6 @@ class ReportesBasculaApp:
 
 
 
-    def crear_base_access(ruta):
-        try:
-            import win32com.client  # libreria importada
-            engine = win32com.client.Dispatch("DAO.DBEngine.120")
-            db = engine.CreateDatabase(ruta, ";LANGID=0x0409;CP=1252;COUNTRY=0", 64)
-            db.Close()
-        except ImportError:
-            messagebox.showerror("Error", "win32com.client no está instalado. No se puede crear Access.")
 
   
     # === Exportación a ACCESS ===
@@ -763,7 +853,7 @@ class ReportesBasculaApp:
 
         # Crear archivo vacío si no existe
         if not os.path.exists(archivo):
-            # Opción 1: copiar una base vacía de Access como plantilla
+            """# Opción 1: copiar una base vacía de Access como plantilla
             plantilla = r"C:\Windows\SysWOW64\msaccess.accdb"  # ejemplo
             if os.path.exists(plantilla):
                 shutil.copy(plantilla, archivo)
@@ -771,7 +861,8 @@ class ReportesBasculaApp:
                 # Opción 2: crear un archivo vacío (el driver lo acepta igual)
                 #open(archivo, "w").close()
                 if not os.path.exists(archivo):
-                    crear_base_access(archivo)
+                    crear_base_access(archivo)"""
+            crear_base_access(archivo)
 
         datos_export = self._preparar_datos_exportacion()
         df = pd.DataFrame(datos_export)
@@ -799,15 +890,38 @@ class ReportesBasculaApp:
 
             # Si la tabla no existe, crearla con las columnas del DataFrame
             columnas = df.columns
-            columnas_def = ", ".join([f"[{col}] TEXT" for col in columnas])
+            # Definir tipos de columnas: DOUBLE para números, TEXT para texto
+            columnas_def = []
+            for col in columnas:
+                if col.lower() in ["peso_bruto", "peso_tara", "peso_neto"]:
+                    columnas_def.append(f"[{col}] DOUBLE")
+                else:
+                    columnas_def.append(f"[{col}] TEXT")
+            columnas_def = ", ".join(columnas_def)
+
             cursor.execute(f"CREATE TABLE {tabla} ({columnas_def})")
 
             # Insertar filas
-            for _, fila in df.iterrows():
+            """for _, fila in df.iterrows():
                 placeholders = ", ".join(["?"] * len(fila))
                 cursor.execute(
                     f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({placeholders})",
                     tuple(str(x) for x in fila.values)
+                )"""
+            for _, fila in df.iterrows():
+                placeholders = ", ".join(["?"] * len(fila))
+                valores = []
+                for col, val in zip(columnas, fila.values):
+                    if col.lower() in ["peso_bruto", "peso_tara", "peso_neto"]:
+                        try:
+                            valores.append(float(val))  # aseguramos número
+                        except:
+                            valores.append(None)        # si viene vacío o inválido
+                    else:
+                        valores.append(str(val))        # el resto como texto
+                cursor.execute(
+                    f"INSERT INTO {tabla} ({', '.join(columnas)}) VALUES ({placeholders})",
+                    tuple(valores)
                 )
 
             conn.commit()
@@ -962,10 +1076,19 @@ class ReportesBasculaApp:
             messagebox.showerror("Error", f"No se pudo restaurar la base de datos.\n{e}")
             
 
-
+# === Punto de entrada principal, Ejecutar interfaz si se corre el script directamente ===
+def al_cerrar_programa(root):
+    #  Borra el archivo puntero al cerrar la ventana principal
+    cerrar_proceso_impresion()
+    root.destroy()
 
 # === Punto de entrada principal, Ejecutar interfaz si se corre el script directamente ===
 if __name__ == "__main__":
+    # Borra el archivo puntero al iniciar (por si quedó un residuo de una sesión anterior)
+    cerrar_proceso_impresion()
     root = tk.Tk()
     app = ReportesBasculaApp(root)
+    #  Con esto garantizamos que al cerrar la ventana principal
+    # también se elimine el archivo puntero .proceso_impresion_activo_reportes
+    root.protocol("WM_DELETE_WINDOW", lambda: al_cerrar_programa(root))
     root.mainloop()

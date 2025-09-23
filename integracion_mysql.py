@@ -29,7 +29,7 @@ def registrar_personal(nombre, login, password, cedula):
     """, (nombre, login, password, cedula))
     conexion.commit()
     conexion.close()
-    print(f"✅ Usuario {nombre} registrado con éxito.")
+    #print(f" Usuario {nombre} registrado con éxito.")
 
 
 def autenticar_usuario(login, password):
@@ -47,9 +47,11 @@ def autenticar_usuario(login, password):
     usuario = cursor.fetchone()
     conexion.close()
     if usuario:
-        print(f"✅ Usuario {usuario['nombre']} autenticado.")
+        #print(f" Usuario {usuario['nombre']} autenticado.")
+        pass
     else:
-        print("❌ Login o contraseña incorrectos.")
+        #print(" Login o contraseña incorrectos.")
+        pass
     return usuario
    
 
@@ -77,9 +79,10 @@ def guardar_evento_desconexion(tipo, tiempo_desconexion=0, id_autorizado=None):
         ))
         conexion.commit()
         conexion.close()
-        print("✅ Evento de desconexión guardado con {tiempo_desconexion} segundos.")
+        #print(" Evento de desconexión guardado con {tiempo_desconexion} segundos.")
     except Exception as e:
-        print(f" Error guardando desconexión: {e}")
+        #print(f" Error guardando desconexión: {e}")
+        pass
         
         
 # =======================
@@ -158,6 +161,7 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
 
         conexion.commit()
         conexion.close()
-        print("✅ Cliente y pesaje guardados con peso_neto.")
+        #print(" Cliente y pesaje guardados con peso_neto.")
     except Exception as e:
-        print(f"❌ Error guardando cliente y pesaje: {e}")
+        #print(f" Error guardando cliente y pesaje: {e}")
+        pass

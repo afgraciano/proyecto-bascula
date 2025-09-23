@@ -9,13 +9,6 @@
         "correo": "afgraciano@hotmail.com",
         "id_autorizado": 1
     },
-    "Externo:Cipreses de Colombia:KKY168 123": {
-        "tipo": "Externo",
-        "id": "KKY168 123",
-        "peso_entrada": 10000,
-        "fecha_hora_entrada": "2025-08-29 05:33:56",
-        "id_autorizado": 1
-    },
     "Aserrio:KKY168 RG123": {
         "tipo": "Aserrio",
         "id": "KKY168 RG123",

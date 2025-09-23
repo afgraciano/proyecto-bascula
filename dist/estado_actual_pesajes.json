@@ -1,10 +1,10 @@
 {
-    "Externo:Tercero (pago inmediato):ASD654 123:Esta Es La Prueba:789456123": {
+    "Externo:Tercero (pago inmediato):ASD654 123:Gilberto Hinestroza:789456123": {
         "tipo": "Externo",
         "id": "ASD654 123",
         "peso_entrada": 2700,
         "fecha_hora_entrada": "2025-08-26 20:03:31",
-        "razon": "Esta Es La Prueba",
+        "razon": "Gilberto Hinestroza",
         "nit": "789456123",
         "correo": "gilberto@hotmail.com"
     },
@@ -34,6 +34,30 @@
         "id": "KKY168 MS123",
         "peso_entrada": 0,
         "fecha_hora_entrada": "2025-09-10 01:45:20",
+        "id_autorizado": 1
+    },
+    "Externo:Tercero (pago inmediato):KKY168 123ABC:Andres Felipe Graciano Monsalve:71375739": {
+        "tipo": "Externo",
+        "id": "KKY168 123ABC",
+        "peso_entrada": 2700,
+        "fecha_hora_entrada": "2025-09-12 03:14:53",
+        "razon": "Andres Felipe Graciano Monsalve",
+        "nit": "71375739",
+        "correo": "afgraciano@hotmail.com",
+        "id_autorizado": 1
+    },
+    "Astillable Seleccionado:KKY168 RG123": {
+        "tipo": "Astillable Seleccionado",
+        "id": "KKY168 RG123",
+        "peso_entrada": 2700,
+        "fecha_hora_entrada": "2025-09-12 03:59:12",
+        "id_autorizado": 1
+    },
+    "Aserrio:KKY168 RG123": {
+        "tipo": "Aserrio",
+        "id": "KKY168 RG123",
+        "peso_entrada": 2700,
+        "fecha_hora_entrada": "2025-09-12 11:34:25",
         "id_autorizado": 1
     }
 }
