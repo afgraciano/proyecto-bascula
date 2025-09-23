@@ -649,8 +649,7 @@ def verificar_peso():
     global ser   # hacemos global para que reconectar pueda modificarlo
     
     
-    LOGOUT_EVENT.clear()
-    
+    LOGOUT_EVENT.clear()    
     cfg = cargar_config()    
     
     if peso_actual is None:
@@ -659,7 +658,6 @@ def verificar_peso():
     # =============================
     # Espera hasta que haya puerto configurado y disponible
     # =============================
-    
     while not cfg or not hasattr(cfg, "PUERTO_CONFIGURADO"):
         if LOGOUT_EVENT.is_set():   # por si hacen logout aquí
             return
@@ -671,8 +669,10 @@ def verificar_peso():
 
     PUERTO_ACTUAL = cfg.PUERTO_CONFIGURADO
     #print(f" Conectando a {PUERTO_ACTUAL}...")
+    ser = None  # Inicializamos ser para evitar NameError si nunca se abre
     
-    ser = None # Inicializamos ser para evitar NameError si nunca se abre
+    #  Crear ventana de desconexión una sola vez
+    ventana_desconexion = VentanaDesconexion(root)
     while True:
         if LOGOUT_EVENT.is_set():
             return
@@ -683,24 +683,29 @@ def verificar_peso():
             if not puerto_disponible(PUERTO_ACTUAL):
                 #print(f" Puerto {PUERTO_ACTUAL} no disponible en el sistema.")
                 # mostramos ventana de desconexión (no pedimos config de inmediato)
-                ventana_temp = VentanaDesconexion(root)
-                ventana_temp.tipo_desconexion = "cable"   # marcamos desconexión de cable
-                ventana_temp.mostrar()
-                ventana_temp.verificar_estado()
+                if not ventana_desconexion.activa:  # solo mostrar si no está activa
+                    ventana_desconexion.tipo_desconexion = "cable"
+                    ventana_desconexion.mostrar()
+                ventana_desconexion.verificar_estado()
                 time.sleep(1)
                 continue
 
+            # Intentar abrir el puerto
             ser = serial.Serial(PUERTO_ACTUAL, 9600, timeout=0.05)
             ser.reset_input_buffer()
             #print(f" Conectado a {PUERTO_ACTUAL}")
+            # Si logra abrir, cerrar ventana si estaba activa
+            if ventana_desconexion.activa:
+                ventana_desconexion.cerrar()
             break
         except serial.SerialException:
             #print("Puerto no disponible, esperando...")
             time.sleep(1)
 
     #print(" Iniciando monitoreo de la báscula...")
-
-    ventana_desconexion = VentanaDesconexion(root)
+    # =============================
+    # Monitoreo de la báscula
+    # =============================
     ventana_alerta_peso = VentanaAlertaPeso()
     proceso_modulo3 = None  # inicializamos el proceso aquí
     tiempo_sin_datos = 0
@@ -798,13 +803,13 @@ def verificar_peso():
                                 return os.path.exists(os.path.join(BASE_DIR, '.proceso_impresion_activo'))
                             
                             hay_pesaje_abierto = hay_pesajes_abiertos() or hay_impresion_Proceso()
-                            
                             # =============================
                             # Reglas para abrir módulo3
                             # =============================
                             # REGLAS PARA ABRIR MODULO 3 SI PESO>300 O JSON TIENE PESAJES ABIERTOS
                             # Control de tiempo mínimo entre lanzamientos para evitar parpadeo                            
                             TIEMPO_ESPERA_INICIO = 3 # segundos
+                            
                             if peso >= 300 or hay_pesaje_abierto:
                                 tiempo_actual = time.time()
                                 if (not proceso_activo(proceso_modulo3)) and (tiempo_actual - ultimo_inicio_modulo3 > TIEMPO_ESPERA_INICIO):
@@ -816,9 +821,7 @@ def verificar_peso():
                                         #print(f"Activando módulo3 (peso={peso} kg, pesajes_abiertos={hay_pesaje_abierto})")
                                         proceso_modulo3 = ejecutar_modulo3()
                                         ultimo_inicio_modulo3 = tiempo_actual
-                                else:
-                                    #print("módulo3 ya está abierto o se inició hace poco, esperando...")
-                                    pass
+                               
                             # =============================
                             # Reglas para cerrar módulo3
                             # =============================
@@ -826,7 +829,6 @@ def verificar_peso():
                             elif peso < 10 and not hay_pesaje_abierto:
                                 if proceso_activo(proceso_modulo3) or (getattr(sys, 'frozen', False) and hay_modulo3_activo()):
                                     #print(" Cerrando módulo3 (peso < 10 kg y sin pesajes abiertos)")
-                                    pass
                                     if getattr(sys, 'frozen', False):  
                                         cerrar_todos_modulo3(timeout=1.0)  # en exe, cerrar todas
                                     else:
@@ -836,20 +838,16 @@ def verificar_peso():
                                             if proceso_activo(proceso_modulo3):
                                                 #print("Terminate no fue suficiente, forzando kill()")
                                                 proceso_modulo3.kill()
-                                            else:
-                                                #print("módulo3 cerrado correctamente")
-                                                pass
                                         except Exception as e:
                                             #print(f"Error al cerrar módulo3: {e}")
                                             pass
                                     proceso_modulo3 = None
-                                else:
-                                    #print(f" Peso bajo y sin pesajes abiertos ({peso} kg)")
-                                    pass
                     else:
                         tiempo_sin_datos += 1
                         if tiempo_sin_datos >= intervalo_reconexion:
-                            ventana_desconexion.mostrar()
+                            if not ventana_desconexion.activa:
+                                ventana_desconexion.tipo_desconexion = "sin_datos"
+                                ventana_desconexion.mostrar()
                             ventana_desconexion.verificar_estado()
            
             except serial.SerialException:
