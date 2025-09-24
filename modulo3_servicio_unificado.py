@@ -433,9 +433,23 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
     entry_remision = tk.Entry(fila_formulario, width=10, font=("Arial", 10))
     entry_remision.grid(row=1, column=2, padx=10)
 
+    # Tipo de Vehículo (opcional)
+    tk.Label(fila_formulario, text="Tipo de Vehículo (opcional):", anchor="center").grid(row=0, column=3, padx=10)
+    entry_tipo_vehiculo = tk.Entry(fila_formulario, width=15, font=("Arial", 10))
+    entry_tipo_vehiculo.grid(row=1, column=3, padx=10)
 
-    # NUEVO BLOQUE - Manejo de navegación por ENTER entre campos con validación parcial
+    # Comentarios (opcional)
+    tk.Label(fila_formulario, text="Comentarios (opcional):", anchor="center").grid(row=0, column=4, padx=10)
+    entry_comentarios = tk.Entry(fila_formulario, width=25, font=("Arial", 10))
+    entry_comentarios.grid(row=1, column=4, padx=10)
 
+
+    # Manejo de navegación por ENTER entre campos con validación parcial
+    
+    # normalizamos texto para poner la primera letra mayuscula
+    def normalizar_texto(texto):
+        return texto.capitalize() if texto else None
+    
     # Al presionar Enter en placa → validar formato y mover al grupo RG/MS
     def validar_placa_y_mover(event=None):
         placa = entry_placa.get().strip().upper()
@@ -471,19 +485,29 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
 
 
     # Al presionar Enter en remisión → validar que no esté vacío y confirmar
-    def validar_remision_y_confirmar(event=None):
+    def mover_a_tipo_vehiculo(event=None):
         remision = entry_remision.get().strip()
         if not remision:
             messagebox.showerror("Campo obligatorio", "Debe ingresar el número de remisión.", parent=ventana)
             entry_remision.focus_set()
             return
+        entry_tipo_vehiculo.focus_set()
+
+    # Al presionar Enter en tipo_vehiculo → mover a comentarios
+    def mover_a_comentarios(event=None):
+        entry_comentarios.focus_set()
+
+    # Al presionar Enter en comentarios → mover a confirmar
+    def mover_a_confirmar(event=None):
         confirmar_datos()
 
     # Asociar las funciones anteriores a teclas Enter
     entry_placa.bind("<Return>", validar_placa_y_mover)
     rb_rg.bind("<Return>", mover_a_remision)
     rb_ms.bind("<Return>", mover_a_remision)
-    entry_remision.bind("<Return>", validar_remision_y_confirmar)
+    entry_remision.bind("<Return>", mover_a_tipo_vehiculo)
+    entry_tipo_vehiculo.bind("<Return>", mover_a_comentarios)
+    entry_comentarios.bind("<Return>", mover_a_confirmar)
 
 
     # Función crea boton para confirmar los datos y continuar el flujo de pesaje
@@ -491,6 +515,10 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         placa = entry_placa.get().strip().upper() # Convierte a mayúsculas automáticamente con upper      
         remision = entry_remision.get().strip()
         empresa_sel = empresa.get()
+
+        tipo_vehiculo = entry_tipo_vehiculo.get().strip().capitalize() if entry_tipo_vehiculo.get().strip() else None
+        comentarios = entry_comentarios.get().strip().capitalize() if entry_comentarios.get().strip() else None
+
 
         # Validación de placa
         if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
@@ -523,15 +551,10 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
         else:
             nombre_empresa = "MS Timberland Holdings Limited"
             nit_empresa = "9004023313"
-
-        #clave_placa_remision = f"{placa} {empresa_sel} {remision}"
-        
-        
-        
+             
         #  Construimos el ID y clave si todo esta bien
         id_ingresado = f"{placa} {empresa_sel}{remision}".strip().upper()
         clave = f"{tipo}:{id_ingresado}".strip()
-        
         
         #adquiero de la variable global el peso antes capturado
         global peso_capturado_global
@@ -541,7 +564,7 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
 
 
         # Continuar con el flujo de lógica normal como si fuera un ingreso valido
-        # Llama a función unificada que maneja apertura o cierre manual
+        # Llama a función unificada que maneja apertura o cierre manual       
         continuar_flujo_pesaje_interno(
             tipo=tipo,
             clave=clave,
@@ -556,7 +579,9 @@ def mostrar_formulario_interno(tipo, ventana, frame_formulario, refrescar_tabla_
                 "codigo_empresa": empresa_sel,
                 "nombre": nombre_empresa,
                 "nit": nit_empresa,
-                "id_ingresado": id_ingresado
+                "id_ingresado": id_ingresado,
+                "tipo_vehiculo": tipo_vehiculo,
+                "comentarios": comentarios
             }
         )
         
@@ -618,7 +643,9 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
                     "peso_bruto": peso_bruto,
                     "peso_tara": peso_tara,
                     "peso_neto": peso_neto,
-                    "placa": id_ingresado.split(" ")[0]# Asume que la placa es la primera parte del ID
+                    "placa": id_ingresado.split(" ")[0],# Asume que la placa es la primera parte del ID
+                    "tipo_vehiculo": datos_empresa.get("tipo_vehiculo"),  
+                    "comentarios": datos_empresa.get("comentarios")
                 },
                 id_autorizado=id_aut
             )
@@ -668,7 +695,7 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
         cerrar_con_peso(peso_confirmado)
         return
 
-    # NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO
+    # NUEVO REGISTRO de pesaje de entrada PARA INMUNIZA / ASERRIO / ASTILLABLE SELECCIONADO
     if tipo in ["Inmuniza", "Aserrío", "Astillable Seleccionado"]:
         fecha_entrada = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
@@ -755,13 +782,14 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
             
             guardar_cliente_y_pesaje(
                 tipo_cliente="interno",
-                
                 datos_cliente=datos_empresa,
                 datos_pesaje={
                     "peso_bruto": peso,
                     "peso_tara": 0,
                     "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
-                    "peso_neto": peso # neto = bruto si no hay tara
+                    "peso_neto": peso, # neto = bruto si no hay tara
+                    "tipo_vehiculo": datos_empresa.get("tipo_vehiculo"),
+                    "comentarios": datos_empresa.get("comentarios")
                 },
                 id_autorizado=id_aut
             )
@@ -802,7 +830,6 @@ def continuar_flujo_pesaje_interno(tipo, clave, id_ingresado, peso, ventana, ref
 #  Función que crea y muestra el formulario visual estándar para Externos (Cipreses de Colombia, Núcleos de Madera, Construinmuniza )
 def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame_formulario, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
     
-    #ventana.geometry("722x668")  #  abre la ventana principal servicio bascula al abrir el formulario
     centrar_ventana(ventana, 1022, 668, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
     
     #  Asegura que el frame esté visible incluso si fue ocultado
@@ -846,8 +873,17 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
     entry_remision = tk.Entry(fila_formulario, width=12, font=("Arial", 10))
     entry_remision.grid(row=1, column=1, padx=10)
     
+    # Tipo de Vehículo (opcional)
+    tk.Label(fila_formulario, text="Tipo de Vehículo:", anchor="center").grid(row=0, column=2, padx=10)
+    entry_tipo_vehiculo = tk.Entry(fila_formulario, width=15, font=("Arial", 10))
+    entry_tipo_vehiculo.grid(row=1, column=2, padx=10)
+
+    # Comentarios (opcional)
+    tk.Label(fila_formulario, text="Comentarios:", anchor="center").grid(row=0, column=3, padx=10)
+    entry_comentarios = tk.Entry(fila_formulario, width=25, font=("Arial", 10))
+    entry_comentarios.grid(row=1, column=3, padx=10)
+    
     # Mover foco de placa → remisión al presionar Enter
-    #entry_placa.bind("<Return>", lambda event: entry_remision.focus_set())
     def validar_placa_y_mover_a_remision(event=None):
         placa = entry_placa.get().strip().upper()
         if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
@@ -869,14 +905,32 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
 
     # Manejo de Enter en remisión con validación si está vacía
     #al presiona enter en remision llama a validar la remision y confirmar
-    entry_remision.bind("<Return>", lambda event: confirmar_datos())
+    #entry_remision.bind("<Return>", lambda event: confirmar_datos())
+    # Al presionar Enter en remisión → mover a tipo de vehículo (sin validación extra, ya se hace en confirmar_datos)
+    def mover_a_tipo_vehiculo(event=None):
+        entry_tipo_vehiculo.focus_set()
 
+    entry_remision.bind("<Return>", mover_a_tipo_vehiculo)
+
+    # Al presionar Enter en tipo_vehiculo → mover a comentarios
+    def mover_a_comentarios(event=None):
+        entry_comentarios.focus_set()
+
+    entry_tipo_vehiculo.bind("<Return>", mover_a_comentarios)
+
+    # Al presionar Enter en comentarios → confirmar directamente
+    def mover_a_confirmar(event=None):
+        confirmar_datos()
+
+    entry_comentarios.bind("<Return>", mover_a_confirmar)
 
     
     # Función crea boton para confirmar los datos y continuar el flujo de pesaje
     def confirmar_datos():        
         placa = entry_placa.get().strip().upper()# Convierte a mayúsculas automáticamente con upper 
         remision = entry_remision.get().strip().upper()# Convierte a mayúsculas automáticamente con upper 
+        tipo_vehiculo = entry_tipo_vehiculo.get().strip().capitalize() if entry_tipo_vehiculo.get().strip() else None
+        comentarios = entry_comentarios.get().strip().capitalize() if entry_comentarios.get().strip() else None
         
         
         # Validación de placa
@@ -933,9 +987,11 @@ def mostrar_formulario_externo_pago_mensual(cliente_nombre, tipo, ventana, frame
                 "tipo": tipo,
                 "nombre": nombre,
                 "nit": nit,
-                "id_ingresado": id_ingresado
+                "id_ingresado": id_ingresado,
+                "tipo_vehiculo": tipo_vehiculo,   
+                "comentarios": comentarios  
             }
-            )
+        )
    
             
             
@@ -1006,6 +1062,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
                 "peso_tara": peso_tara,
                 "peso_neto": peso_neto,
                 "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
+                "tipo_vehiculo": datos_empresa.get("tipo_vehiculo"),   
+                "comentarios": datos_empresa.get("comentarios"), 
             },
             id_autorizado=id_aut
         )
@@ -1065,8 +1123,9 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
 
         with open(archivo_estado, "w") as file:
             json.dump(estado, file, indent=4)
-
+        #guarda en el json pesaje inicial
         actualizar_estado_pesajes()
+        #crea tiquete de impresion
         encabezado = f"Cliente: {datos_empresa['nombre']}\nNIT: {datos_empresa['nit']}\n"
         contenido = (
             f"{encabezado}"
@@ -1113,6 +1172,8 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
                 "peso_tara": None,
                 "peso_neto": peso, # si no hay tara, peso_neto = peso_bruto
                 "placa": id_ingresado.split(" ")[0], # Asume que la placa es la primera parte del ID
+                "tipo_vehiculo": datos_empresa.get("tipo_vehiculo"),  
+                "comentarios": datos_empresa.get("comentarios"), 
             },
             id_autorizado=id_aut
         )
@@ -1147,7 +1208,7 @@ def continuar_flujo_pesaje_externo(tipo, clave, id_ingresado, peso, ventana, ref
 def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_formulario, refrescar_tabla_pesajes=None, limpiar_formulario_unicamente=None):
     
     #ventana.geometry("852x668")  #  abre la ventana principal servicio bascula al abrir el formulario
-    centrar_ventana(ventana, 852, 668, margen_superior=50)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
+    centrar_ventana(ventana, 902, 768, margen_superior=30)  #  Restaura tamaño original y centrar ventana original al cerrar el formulario
     # Asegura visibilidad del frame, Mostrar y limpiar el formulario
     frame_formulario.pack(pady=10, fill="x")
     for widget in frame_formulario.winfo_children():
@@ -1178,6 +1239,14 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
     tk.Label(fila_formulario, text="Correo electrónico (opcional):").grid(row=0, column=4, padx=10)
     entry_correo = tk.Entry(fila_formulario, width=25, font=("Arial", 10))
     entry_correo.grid(row=1, column=4, padx=10)
+
+    tk.Label(fila_formulario, text="Tipo de vehículo (opcional):").grid(row=2, column=0, padx=10)
+    entry_tipo_vehiculo = tk.Entry(fila_formulario, width=20, font=("Arial", 10))
+    entry_tipo_vehiculo.grid(row=3, column=0, padx=10)
+
+    tk.Label(fila_formulario, text="Comentarios (opcional):").grid(row=2, column=1, padx=10)
+    entry_comentarios = tk.Entry(fila_formulario, width=40, font=("Arial", 10))
+    entry_comentarios.grid(row=3, column=1, padx=10, columnspan=2)
 
 
     # Navegación automática con validaciones parciales al presionar Enter
@@ -1220,7 +1289,9 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
     entry_remision.bind("<Return>", lambda e: entry_nombre.focus_set())
     entry_nombre.bind("<Return>", validar_nombre_y_mover)
     entry_nit.bind("<Return>", validar_nit_y_mover)
-    entry_correo.bind("<Return>", lambda e: confirmar_datos())
+    entry_correo.bind("<Return>", lambda e: entry_tipo_vehiculo.focus_set())
+    entry_tipo_vehiculo.bind("<Return>", lambda e: entry_comentarios.focus_set())
+    entry_comentarios.bind("<Return>", lambda e: confirmar_datos())
 
 
     # Función que se ejecuta al confirmar
@@ -1230,7 +1301,9 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
         razon = entry_nombre.get().strip()
         nit = entry_nit.get().strip()
         correo = entry_correo.get().strip()
-
+        tipo_vehiculo = entry_tipo_vehiculo.get().strip()
+        comentarios = entry_comentarios.get().strip()
+        
         # Validaciones
         if not re.fullmatch(r"[A-Z]{3}\d{3}", placa):
             messagebox.showerror(
@@ -1254,7 +1327,6 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             entry_nombre.focus_set()
             return
 
-
         if not re.fullmatch(r"[A-Za-zÁÉÍÓÚÑáéíóúñ0-9 .,'&-]+", razon):
             messagebox.showerror("Error", "Razón social contiene caracteres inválidos.", parent=ventana)
             entry_nombre.focus_set()
@@ -1273,6 +1345,12 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
             messagebox.showwarning("Correo inválido", "Formato incorrecto de correo.", parent=ventana)
             entry_correo.focus_set()
             return
+        
+        # Capitalizar (poner primera letra mayuscula) tipo_vehiculo y comentarios si no están vacíos
+        if tipo_vehiculo:
+            tipo_vehiculo = tipo_vehiculo.capitalize()
+        if comentarios:
+            comentarios = comentarios.capitalize()
 
         id_ingresado = f"{placa} {remision}".strip()
         #  Clave completa usada para identificar pesajes únicos
@@ -1342,8 +1420,11 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                     "peso_bruto": peso_bruto,
                     "peso_tara": peso_tara,
                     "peso_neto": peso_neto,
-                    "placa": placa
+                    "placa": placa,
+                    "tipo_vehiculo": tipo_vehiculo,  
+                    "comentarios": comentarios  
                 },
+
                 id_autorizado=id_aut
             )
             # FIN BLOQUE DE INTEGRACIÓN MYSQL
@@ -1451,7 +1532,9 @@ def mostrar_formulario_externo_tercero(cliente_nombre, tipo, ventana, frame_form
                     "peso_bruto": peso,
                     "peso_tara": None,
                     "peso_neto": peso,
-                    "placa": placa
+                    "placa": placa,
+                    "tipo_vehiculo": tipo_vehiculo,  
+                    "comentarios": comentarios  
                 },
                 id_autorizado=id_aut
             )

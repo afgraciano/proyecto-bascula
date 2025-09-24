@@ -168,8 +168,8 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
 
         cursor.execute("""
             INSERT INTO pesajes (
-                fecha_hora, tipo_cliente, peso_bruto, peso_tara, peso_neto, placa, id_cliente, id_autorizado
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                fecha_hora, tipo_cliente, peso_bruto, peso_tara, peso_neto, placa, id_cliente, id_autorizado, tipo_vehiculo, comentarios
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """, (
             datetime.now(),
             tipo_cliente,
@@ -178,7 +178,9 @@ def guardar_cliente_y_pesaje(tipo_cliente, datos_cliente, datos_pesaje, id_autor
             peso_neto,
             datos_pesaje.get("placa"),
             id_cliente,
-            id_autorizado
+            id_autorizado,
+            datos_pesaje.get("tipo_vehiculo"),
+            datos_pesaje.get("comentarios")
         ))
 
         conexion.commit()

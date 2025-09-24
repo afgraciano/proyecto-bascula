@@ -1,63 +1,40 @@
 {
-    "Externo:Tercero (pago inmediato):ASD654 123:Gilberto Hinestroza:789456123": {
+    "Externo:Tercero (pago inmediato):KKY168 123:Andres Felipe Graciano Monsalve:71375739": {
         "tipo": "Externo",
-        "id": "ASD654 123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:03:31",
-        "razon": "Gilberto Hinestroza",
-        "nit": "789456123",
-        "correo": "gilberto@hotmail.com"
-    },
-    "Externo:Cipreses de Colombia:KKY321 654": {
-        "tipo": "Externo",
-        "id": "KKY321 654",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:07:59"
-    },
-    "Aserrio:KKY168 MS123": {
-        "tipo": "Aserrio",
-        "id": "KKY168 MS123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 20:23:24"
-    },
-    "Externo:Tercero (pago inmediato):ABC123 456:Andres:71375473": {
-        "tipo": "Externo",
-        "id": "ABC123 456",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-08-26 21:34:09",
-        "razon": "Andres",
-        "nit": "71375473",
-        "correo": "ag@gmail.com"
-    },
-    "Astillable:KKY168 MS123": {
-        "tipo": "Astillable",
-        "id": "KKY168 MS123",
-        "peso_entrada": 0,
-        "fecha_hora_entrada": "2025-09-10 01:45:20",
-        "id_autorizado": 1
-    },
-    "Externo:Tercero (pago inmediato):KKY168 123ABC:Andres Felipe Graciano Monsalve:71375739": {
-        "tipo": "Externo",
-        "id": "KKY168 123ABC",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-09-12 03:14:53",
+        "id": "KKY168 123",
+        "peso_entrada": 10000,
+        "fecha_hora_entrada": "2025-08-29 05:33:19",
         "razon": "Andres Felipe Graciano Monsalve",
         "nit": "71375739",
         "correo": "afgraciano@hotmail.com",
         "id_autorizado": 1
     },
-    "Astillable Seleccionado:KKY168 RG123": {
+    "Astillable Seleccionado:KKY168 MS123": {
         "tipo": "Astillable Seleccionado",
-        "id": "KKY168 RG123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-09-12 03:59:12",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-09 23:29:51",
+        "id_autorizado": 2
+    },
+    "Astillable:KKY168 MS123": {
+        "tipo": "Astillable",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-09 23:30:17",
+        "id_autorizado": 2
+    },
+    "Aserr\u00edo:KKY168 MS789": {
+        "tipo": "Aserr\u00edo",
+        "id": "KKY168 MS789",
+        "peso_entrada": 6667,
+        "fecha_hora_entrada": "2025-09-24 03:05:53",
         "id_autorizado": 1
     },
-    "Aserrio:KKY168 RG123": {
-        "tipo": "Aserrio",
-        "id": "KKY168 RG123",
-        "peso_entrada": 2700,
-        "fecha_hora_entrada": "2025-09-12 11:34:25",
+    "Aserr\u00edo:KKY168 MS123": {
+        "tipo": "Aserr\u00edo",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-24 03:11:06",
         "id_autorizado": 1
     }
 }

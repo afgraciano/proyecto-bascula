@@ -118,6 +118,20 @@ CREATE TABLE IF NOT EXISTS personal_autorizado (
 )
 ''')
 
+# Agregar columnas si no existen
+# Verificar si ya existe la columna tipo_vehiculo en pesajes
+cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'tipo_vehiculo'")
+columna = cursor.fetchone()
+if not columna:
+    cursor.execute("ALTER TABLE pesajes ADD COLUMN tipo_vehiculo VARCHAR(100) NULL")
+
+# Verificar si ya existe la columna comentarios en pesajes
+cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'comentarios'")
+columna = cursor.fetchone()
+if not columna:
+    cursor.execute("ALTER TABLE pesajes ADD COLUMN comentarios VARCHAR(255) NULL")
+
+# Relaciones
 # Verificar si la columna id_autorizado ya existe en pesajes
 cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'id_autorizado'")
 columna = cursor.fetchone()
@@ -132,7 +146,6 @@ if not columna:
 else:
     #print(" La columna id_autorizado ya existe en pesajes.")
     pass
-    
     
 
 # Verificar si la columna id_autorizado ya existe en desconexiones

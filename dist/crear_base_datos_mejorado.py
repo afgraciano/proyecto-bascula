@@ -1,3 +1,28 @@
+"""
+crear_base_datos_mejorado.py
+
+Script para la creación y actualización de la base de datos MySQL usada en el sistema de pesaje.
+
+Funciones principales:
+- Crear la base de datos `bascula_silvotecnia` si no existe.
+- Definir las tablas principales:
+  * pesajes
+  * cliente_tercero
+  * cliente_mensual
+  * cliente_interno
+  * desconexiones
+  * personal_autorizado
+- Verificar y agregar columnas adicionales en tablas existentes:
+  * Agrega columna `tiempo_desconexion` en `desconexiones` si no existe.
+  * Agrega columna `id_autorizado` con su llave foránea en `pesajes` y `desconexiones`.
+- Establecer relaciones de integridad referencial:
+  * `pesajes.id_autorizado → personal_autorizado.id_autorizado`
+  * `desconexiones.id_autorizado → personal_autorizado.id_autorizado`
+
+Notas:
+- Este script se debe ejecutar una sola vez al instalar el sistema o tras modificaciones de esquema.
+- Es seguro para múltiples ejecuciones: usa `CREATE TABLE IF NOT EXISTS` y validaciones previas antes de alterar.
+"""
 # Contenido del script para crear múltiples tablas
 import mysql.connector
 
@@ -93,6 +118,20 @@ CREATE TABLE IF NOT EXISTS personal_autorizado (
 )
 ''')
 
+# Agregar columnas si no existen
+# Verificar si ya existe la columna tipo_vehiculo en pesajes
+cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'tipo_vehiculo'")
+columna = cursor.fetchone()
+if not columna:
+    cursor.execute("ALTER TABLE pesajes ADD COLUMN tipo_vehiculo VARCHAR(100) NULL")
+
+# Verificar si ya existe la columna comentarios en pesajes
+cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'comentarios'")
+columna = cursor.fetchone()
+if not columna:
+    cursor.execute("ALTER TABLE pesajes ADD COLUMN comentarios VARCHAR(255) NULL")
+
+# Relaciones
 # Verificar si la columna id_autorizado ya existe en pesajes
 cursor.execute("SHOW COLUMNS FROM pesajes LIKE 'id_autorizado'")
 columna = cursor.fetchone()
@@ -107,7 +146,6 @@ if not columna:
 else:
     #print(" La columna id_autorizado ya existe en pesajes.")
     pass
-    
     
 
 # Verificar si la columna id_autorizado ya existe en desconexiones

@@ -30,13 +30,13 @@ import os  # Operaciones con archivos y deteccion de ejecutables
 
     
 #  Función global para centrar cualquier ventana (Tk o Toplevel)
-def centrar_ventana(ventana, ancho=1300, alto=650, margen_superior=None):
+def centrar_ventana(ventana, ancho=1500, alto=650, margen_superior=None):
     """
     Centra una ventana (Tk o Toplevel) en la pantalla con el tamaño indicado.
     
     Parámetros:
         ventana         -> instancia de Tk() o Toplevel()
-        ancho (int)     -> ancho de la ventana en píxeles (default 1300)
+        ancho (int)     -> ancho de la ventana en píxeles (default 1500)
         alto (int)      -> alto de la ventana en píxeles (default 650)
         margen_superior -> si se pasa, reemplaza la posición vertical (y),
                            útil por ejemplo para ventanas de impresión
@@ -242,9 +242,7 @@ def mostrar_tiquete_con_impresion(titulo, contenido):
     ventana.title(titulo)
     centrar_ventana(ventana, 410, 500, margen_superior=50)
     ventana.resizable(False, False)
-    #ventana.attributes("-topmost", True)
     ventana.grab_set()  #  Hace modal el preview
-
     ventanas_tiquete_abiertas.append(ventana)
 
     # Área de texto
@@ -558,10 +556,10 @@ class ReportesBasculaApp:
         # Configuración inicial de la ventana principal
         self.root = root
         self.root.title("Consulta y Reportes - Báscula")
-        self.root.geometry("1300x650")  # Tamaño inicial de ventana
+        self.root.geometry("1500x650")  # Tamaño inicial de ventana
         
-        # Esto fija tamaño 1300x650 y centra la ventana de inmediato
-        centrar_ventana(self.root, 1300, 650)
+        # Esto fija tamaño 1500x650 y centra la ventana de inmediato
+        centrar_ventana(self.root, 1500, 650)
         
         
         # === CREAR TODOS LOS WIDGETS DE LA INTERFAZ===
@@ -634,6 +632,7 @@ class ReportesBasculaApp:
                         p.fecha_hora, 
                         p.tipo_cliente,
                         p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        p.tipo_vehiculo, p.comentarios,
                         t.nombre, t.cedula_nit, t.correo_remision,
                         SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
@@ -651,6 +650,7 @@ class ReportesBasculaApp:
                         p.fecha_hora, 
                         p.tipo_cliente,
                         p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        p.tipo_vehiculo, p.comentarios,
                         m.nombre, m.nit, NULL AS correo_remision,
                         SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
@@ -667,6 +667,7 @@ class ReportesBasculaApp:
                     SELECT p.id_pesaje,
                         i.id_ingresado, p.fecha_hora, i.tipo AS tipo_cliente,
                         p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        p.tipo_vehiculo, p.comentarios,
                         i.nombre, i.nit, NULL AS correo_remision,
                         SUBSTRING_INDEX(pa.nombre, ' ', 1) AS nombre_autorizado
                     FROM pesajes p
@@ -684,6 +685,7 @@ class ReportesBasculaApp:
                         p.fecha_hora, 
                         COALESCE(i.tipo, p.tipo_cliente) AS tipo_cliente,  
                         p.peso_bruto, p.peso_tara, p.peso_neto, p.placa,
+                        p.tipo_vehiculo, p.comentarios,
                         COALESCE(t.nombre, m.nombre, i.nombre) AS nombre,
                         COALESCE(t.cedula_nit, m.nit, i.nit) AS cedula_nit,
                         COALESCE(t.correo_remision, '') AS correo_remision,
@@ -812,6 +814,8 @@ class ReportesBasculaApp:
                 "peso_tara": "Peso Tara (kg)",
                 "peso_neto": "Peso Neto (kg)",
                 "placa": "Placa",
+                "tipo_vehiculo": "Tipo Vehículo",
+                "comentarios": "Comentarios",
                 "correo_remision": "Correo Remisión",
                 "nombre_autorizado": "Autorizado"
             }

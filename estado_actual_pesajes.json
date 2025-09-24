@@ -9,13 +9,6 @@
         "correo": "afgraciano@hotmail.com",
         "id_autorizado": 1
     },
-    "Aserrio:KKY168 RG123": {
-        "tipo": "Aserrio",
-        "id": "KKY168 RG123",
-        "peso_entrada": 10000,
-        "fecha_hora_entrada": "2025-08-29 05:34:18",
-        "id_autorizado": 1
-    },
     "Astillable Seleccionado:KKY168 MS123": {
         "tipo": "Astillable Seleccionado",
         "id": "KKY168 MS123",
@@ -29,5 +22,19 @@
         "peso_entrada": 0,
         "fecha_hora_entrada": "2025-09-09 23:30:17",
         "id_autorizado": 2
+    },
+    "Aserr\u00edo:KKY168 MS789": {
+        "tipo": "Aserr\u00edo",
+        "id": "KKY168 MS789",
+        "peso_entrada": 6667,
+        "fecha_hora_entrada": "2025-09-24 03:05:53",
+        "id_autorizado": 1
+    },
+    "Aserr\u00edo:KKY168 MS123": {
+        "tipo": "Aserr\u00edo",
+        "id": "KKY168 MS123",
+        "peso_entrada": 0,
+        "fecha_hora_entrada": "2025-09-24 03:11:06",
+        "id_autorizado": 1
     }
 }
