@@ -334,7 +334,7 @@ peso_capturado_global = None
 
 # Función para confirmar o permitir ingreso manual si el peso es cero
 def confirmar_o_pedir_peso(peso, ventana):
-    if peso <= 10:
+    if peso <= 300:
         decision = messagebox.askyesno(
             "Cierre con peso bajo",
             f"El peso actual es {peso:.2f} kg.\n¿Desea cerrar con este peso presione Si o ingresar un peso manual presione no?",
