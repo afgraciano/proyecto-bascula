@@ -616,7 +616,7 @@ class VentanaAlertaPeso:
 def iniciar_socket():
     #global peso_actual   #  NECESARIO para que lea el valor actualizado
     HOST = "127.0.0.1"
-    PORT = 5000
+    PORT = 8081
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))

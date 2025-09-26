@@ -309,7 +309,7 @@ def obtener_datos_peso():
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.settimeout(1.0)                     # evita bloquear mucho tiempo
-            s.connect(("127.0.0.1", 5000))
+            s.connect(("127.0.0.1", 8081))
             data = b''
             # leer hasta que el servidor cierre o no haya más datos
             while True:
